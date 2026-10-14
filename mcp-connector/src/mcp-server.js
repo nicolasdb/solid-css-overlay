@@ -1,0 +1,1528 @@
+#!/usr/bin/env node
+/**
+ * mcp-server.js
+ *
+ * Exposes the Pod toolkit as MCP tools over Streamable HTTP, so Claude.ai's
+ * remote-connector infra (or any MCP-capable HTTP client) can reach it at a
+ * public URL. claude.ai's code sandbox cannot reach pod.nicolasdb.eu at all
+ * (403 host_not_allowed), so a remote connector — Claude calling this server
+ * from Anthropic's infra — is the only viable direction; stdio only works
+ * for a locally-spawned process.
+ *
+ * NOTE ON VERSIONS: MCP shipped a v2 SDK around the 2026-07-28 spec release.
+ * This file targets the v1.x API (server.registerTool), which stays
+ * supported for production use for a while after v2 ships. package.json
+ * pins the SDK to the 1.x line for that reason — check the current MCP
+ * TypeScript SDK docs before bumping it, since the API does change across
+ * major versions.
+ *
+ * Session model: stateless, per-request transport+server (see Dev Notes in
+ * story 8-2-http-transport.md, "Concurrency trap"). Story 8.3: N Solid
+ * sessions (one per configured identity, see identityRegistry.js) are
+ * boot-time singletons reused across every request to their slug — logging
+ * in per request would be a real regression (latency + needless token churn
+ * against CSS).
+ *
+ * Routing: POST /mcp/<slug> looks up the matching identity's session and
+ * builds a fresh per-request server bound to it (buildMcpServer(identity)).
+ * Unknown slugs get a generic 404 (AC4) — see identities.example.json for
+ * the config shape and identityRegistry.js for load/validation.
+ *
+ * Run: node src/mcp-server.js  (reads PORT/HOST from env, defaults below)
+ */
+
+const express = require("express");
+const { McpServer } = require("@modelcontextprotocol/sdk/server/mcp.js");
+const { StreamableHTTPServerTransport } = require("@modelcontextprotocol/sdk/server/streamableHttp.js");
+const { createMcpExpressApp } = require("@modelcontextprotocol/sdk/server/express.js");
+const rateLimit = require("express-rate-limit");
+const { z } = require("zod");
+
+const { getAgentSession } = require("./auth");
+const { loadIdentities } = require("./identityRegistry");
+const podClient = require("./podClient");
+const wacManager = require("./wacManager");
+const { appendAuditEntry } = require("./journal");
+const { isForeignResource, writeReadReceipt } = require("./receipt");
+const { buildOnboardRouter } = require("./onboardRouter");
+const uploadTickets = require("./uploadTickets");
+const collectiveGraph = require("./collectiveGraph");
+const profile = require("./profile");
+
+// Story 8.10: the ticket handed back by solid_prepare_upload must be an
+// absolute, public URL — the agent runs curl from its own shell, not from
+// inside this container — so it always points at the IP-allowlisted-minus-
+// /upload/ public vhost, same hardcoded-base pattern onboardRouter.js uses
+// for its own connector URL, never the internal HOST/PORT this process
+// actually binds.
+// This connector's public address, as the gateway serves it: upload links and
+// the connector URL handed out at onboarding are built on it. Per instance
+// (.env); the default is instance 1's, so pocpod0 runs unchanged.
+const UPLOAD_PUBLIC_BASE = process.env.MCP_PUBLIC_BASE || "https://solid-mcp.nicolasdb.eu/";
+
+// AC7: app-level cap for POST /upload/:token, independent of the /mcp path's
+// 100kb JSON ceiling — this route never touches express.json(). Must match
+// the nginx `client_max_body_size` set on `location /upload/` (Task 4.1):
+// raising one without the other just moves where an oversized body is
+// rejected, it does not change what actually fits.
+const UPLOAD_MAX_BYTES = parsePositiveInt(
+  "UPLOAD_MAX_BYTES",
+  process.env.UPLOAD_MAX_BYTES,
+  25 * 1024 * 1024 // 25 MiB
+);
+
+// Task 4.3: must stay under nginx's proxy_read_timeout for location
+// /upload/ (set to 300s there — see 11-solid-mcp.conf), same "give the
+// tidier error first" reasoning as REQUEST_TIMEOUT_MS for /mcp.
+const UPLOAD_REQUEST_TIMEOUT_MS = parsePositiveInt(
+  "UPLOAD_REQUEST_TIMEOUT_MS",
+  process.env.UPLOAD_REQUEST_TIMEOUT_MS,
+  290000 // 290s
+);
+
+const PORT = parsePort(process.env.PORT);
+const HOST = process.env.HOST || "127.0.0.1";
+
+// Comma-separated Host header allowlist. Only meaningful when HOST is not a
+// loopback address: createMcpExpressApp auto-enables DNS-rebinding protection
+// for 127.0.0.1/localhost/::1 and silently disables it for anything else, so
+// binding 0.0.0.0 behind nginx (story 8.4) needs this set explicitly.
+const ALLOWED_HOSTS = process.env.ALLOWED_HOSTS
+  ? process.env.ALLOWED_HOSTS.split(",").map((h) => h.trim()).filter(Boolean)
+  : undefined;
+
+// Story 8.4 AC4. Two buckets, because the two paths are abused differently:
+// a valid slug is a known caller doing too much work, an unknown slug is
+// someone guessing at a 22-char secret. The guessing path gets the tighter
+// budget — it has no legitimate high-volume use at all.
+const RATE_LIMIT_WINDOW_MS = 60 * 1000;
+const RATE_LIMIT_MAX = parsePositiveInt("RATE_LIMIT_MAX", process.env.RATE_LIMIT_MAX, 120);
+const RATE_LIMIT_MAX_UNKNOWN = parsePositiveInt(
+  "RATE_LIMIT_MAX_UNKNOWN",
+  process.env.RATE_LIMIT_MAX_UNKNOWN,
+  10
+);
+
+// AC4.4 (body-size cap) — resolved, no code needed here. 8.2 flagged
+// solid_write_resource's `content` as an unbounded z.string(), but the body
+// never actually was unbounded: createMcpExpressApp() registers
+// express.json() itself, with express's default 100kb limit, before any of
+// our middleware. Adding a second parser here would be dead code — the
+// first one registered wins, so a later, larger limit cannot raise the cap.
+// 100kb is the real effective ceiling; nginx's client_max_body_size is set
+// to match so oversized bodies are refused at the edge instead of being
+// streamed into Node first. Raising it means passing an explicit
+// { limit } through the SDK, which its current API does not expose.
+const MAX_BODY_BYTES = "100kb"; // effective, imposed by the SDK — informational
+
+// AC4.4: a hung upstream (CSS not answering) otherwise holds a
+// transport+server pair open forever. Slightly under nginx's
+// proxy_read_timeout 60s so this side gives the tidier JSON-RPC error
+// rather than nginx's opaque 504.
+const REQUEST_TIMEOUT_MS = parsePositiveInt(
+  "REQUEST_TIMEOUT_MS",
+  process.env.REQUEST_TIMEOUT_MS,
+  55000
+);
+
+/**
+ * Rate-limit responses must use the same generic shape as the 404 path
+ * (AC4/8.3): a 429 that looked different per-slug would confirm which
+ * slugs exist. Never log the slug — it is the credential being guessed.
+ */
+function rateLimitHandler(req, res) {
+  res.status(429).json({
+    jsonrpc: "2.0",
+    error: { code: -32000, message: "Too many requests." },
+    id: null,
+  });
+}
+
+function parsePort(raw) {
+  if (!raw) return 3939;
+  const port = Number(raw);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error(`Invalid PORT "${raw}" — must be an integer between 1 and 65535.`);
+  }
+  return port;
+}
+
+/**
+ * A malformed numeric env var (e.g. RATE_LIMIT_MAX="abc") must fail loudly at
+ * boot, not silently become NaN — a NaN limit/timeout/bound compares false
+ * against everything downstream (e.g. journal.js's rotation-size check),
+ * which quietly disables the thing it was meant to configure.
+ */
+function parsePositiveInt(name, raw, fallback) {
+  if (raw === undefined || raw === "") return fallback;
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < 1) {
+    throw new Error(`Invalid ${name} "${raw}" — must be a positive integer.`);
+  }
+  return value;
+}
+
+/**
+ * Map a routine Solid/CSS error to a human-actionable MCP error result
+ * instead of leaking a stack trace. Reuses 8.1's documented wording for the
+ * Control-access case (wacManager.js's _saveAclOrThrowControlError) rather
+ * than inventing new phrasing.
+ *
+ * Story 8.5 Task 5: classify by HTTP status code FIRST. wacManager.js now
+ * normalizes every Solid/Inrupt error it throws (or lets through) to carry
+ * an explicit `.statusCode` — extracted from the bracketed status in
+ * Inrupt's FetchError message when Inrupt itself doesn't expose one (see
+ * wacManager.js `_normalizeFetchError`) — so by the time an error reaches
+ * here, status should almost always be present. The message-substring
+ * checks below are now a genuine fallback for the rare error that reaches
+ * this function without ever having passed through wacManager's
+ * normalization (e.g. a future call path added without it), not the
+ * primary classification path. A future refactor that reword's wacManager's
+ * error text can no longer silently reclassify these as generic errors,
+ * because the status code — not the wording — is what's matched first.
+ */
+function toToolErrorResult(err) {
+  const status = err && (err.statusCode || err.status || (err.response && err.response.status));
+  let message;
+
+  if (status === 401) {
+    message = "Not authenticated — the agent's Solid session is not logged in.";
+  } else if (status === 403) {
+    message = err.message && err.message.includes("Control")
+      ? err.message
+      : "Access denied — this agent lacks the required WAC permission on that resource.";
+  } else if (status === 404) {
+    message = "Resource not found at that URL.";
+  } else if (status === 409) {
+    // Story 8.6: both current 409 producers are solid_delete_resource's own
+    // guards (non-empty-container refusal, post-delete still-exists check)
+    // and already carry a specific, actionable message — a generic fallback
+    // here would silently discard it (live-verified 2026-08-02: claude.ai
+    // reported a bare "Conflict" instead of the "non-empty, out of scope"
+    // guidance). Fall back to generic text only if err.message is somehow
+    // empty.
+    message = err && err.message ? err.message : "Conflict — the request could not be completed in the resource's current state.";
+  } else if (status === 501) {
+    message = "Permissions can only be read for RDF resources or containers.";
+  } else if (!status && err && err.message && err.message.toLowerCase().includes("control")) {
+    // Fallback only: no status code was attached at all. wacManager's own
+    // throw paths now always set statusCode=403 for Control-access denials
+    // (Story 8.5 Task 5), so reaching this branch means some other code
+    // path threw a Control-related error without going through
+    // wacManager's normalization.
+    message = "Reading permissions requires Control access on this resource; this agent has read/write only.";
+  } else if (
+    !status &&
+    err &&
+    err.message &&
+    (err.message.includes("501") || err.message.toLowerCase().includes("not implemented"))
+  ) {
+    message = "Permissions can only be read for RDF resources or containers.";
+  } else {
+    message = err && err.message ? err.message : "Unexpected error.";
+  }
+
+  return { content: [{ type: "text", text: message }], isError: true };
+}
+
+/**
+ * True if `err` represents a 404 (resource does not exist yet). Used by
+ * solid_write_resource's existence probe (Task 2.2/2.4) to distinguish
+ * "new resource, unceremonious" from a real failure that must not be
+ * silently treated as "new" (a mis-scoped permission looks like a 403, not
+ * a 404, and must still surface as an error).
+ */
+function _probe404(err) {
+  const status = err && (err.statusCode || err.status || (err.response && err.response.status));
+  if (status) return status === 404;
+  return Boolean(err && err.message && err.message.includes("[404]"));
+}
+
+/**
+ * Wrap a tool handler so thrown Solid/Inrupt errors become MCP error results,
+ * and so every invocation is recorded in the AC7 audit journal — timestamp,
+ * identity label, tool name, target resource, outcome. Never the slug,
+ * client id, secret or token: those never reach this function, only
+ * `identity.label` (resolved once at boot) and the tool's own args do.
+ *
+ * Story 8.5 Task 4: on a 401 (session appears dead), re-authenticate this
+ * identity exactly once and retry the same call. Never retries on 403 —
+ * that is a real WAC denial (AC6 depends on it staying denied), not an
+ * expired-session condition. `fn` must read the session via `identity`
+ * (not a value captured at server-build time) so the retry actually uses
+ * the freshly re-authenticated session — see buildMcpServer below, where
+ * every tool implementation closes over `identity.session`, not `session`.
+ *
+ * @param {string} toolName
+ * @param {{session: object, label: string, clientId: string, clientSecret: string}} identity
+ * @param {string|undefined} resourceKey - name of the arg holding the
+ *   target resource URL (varies per tool: url/containerUrl/resourceUrl).
+ * @param {Function} fn - the actual tool implementation.
+ */
+function safeHandler(toolName, identity, resourceKey, fn) {
+  const label = identity.label;
+  return async (args, ...rest) => {
+    const resource = resourceKey ? args[resourceKey] : undefined;
+    try {
+      let result;
+      try {
+        result = await fn(args, ...rest);
+      } catch (err) {
+        const status = err && (err.statusCode || err.status || (err.response && err.response.status));
+        if (status === 401) {
+          // Bounded to exactly one retry: reauthIdentity is called once
+          // here, and this catch block is not itself re-entered for the
+          // retry's own errors — a second failure (401 again, or anything
+          // else) falls straight through to the outer catch below.
+          await reauthIdentity(identity);
+          result = await fn(args, ...rest);
+        } else {
+          throw err;
+        }
+      }
+      // solid_get_permissions returns { isError: true } without throwing
+      // when Control access is missing — that's a denial, not a crash.
+      appendAuditEntry({ label, tool: toolName, resource, outcome: result && result.isError ? "denied" : "ok" });
+      return result;
+    } catch (err) {
+      const status = err && (err.statusCode || err.status || (err.response && err.response.status));
+      appendAuditEntry({ label, tool: toolName, resource, outcome: status === 403 ? "denied" : "error" });
+      return toToolErrorResult(err);
+    }
+  };
+}
+
+/**
+ * Build a fresh McpServer instance wired to the given identity. Takes the
+ * whole `identity` object (not a bare `session`) so every tool
+ * implementation reads `identity.session` live at call time — required for
+ * Task 4's retry-after-reauth to actually use the new session instead of a
+ * stale one captured when this function ran. Kept as a function of
+ * `identity` — not module-level global wiring — so Story 8.3 can call this
+ * per identity/token without a rewrite.
+ */
+/**
+ * Server-level guidance, handed to the model once at connect time (MCP's
+ * `instructions`, part of the initialize result) rather than repeated in
+ * every tool description.
+ *
+ * This exists because the person on the other end is not expected to know
+ * anything about Solid, WAC, or which tool reads a folder. Live 2026-08-12:
+ * asked to read a container, the model reached for solid_read_resource,
+ * CSS answered 403, and the resulting "access denied" sent everyone off
+ * auditing ACLs that were correct — a whole evening lost to a wrong tool
+ * choice that no user could have been expected to prevent. Tool
+ * descriptions alone did not carry enough of the model to avoid it.
+ *
+ * Keep this short and behavioural. It is prompt context on every session:
+ * facts that change what the model DOES, not a tutorial.
+ */
+const SERVER_INSTRUCTIONS = [
+  "You are connected to a Solid pod through a dedicated agent identity.",
+  "",
+  "WHO AM I. solid_whoami gives the WebID this connector acts as, and what its",
+  "profile declares. Call it first when your role depends on who you are (a",
+  "collective's own agent, or a member's agent).",
+  "",
+  "WHICH POD. This connector cannot discover which pod to work on: Solid has",
+  "no way to ask 'what may this identity reach'. If no pod URL has been given",
+  "to you, ask for one — do not guess hostnames or pod names.",
+  "",
+  "FOLDERS VS FILES. A URL ending in '/' is a container (folder): list it with",
+  "solid_list_container (argument: containerUrl). Anything else is a file: read",
+  "it with solid_read_resource (argument: url). Using the file tool on a folder",
+  "fails in a way that looks like a permission problem but is not.",
+  "",
+  "ACCESS. This identity is not the pod owner. It reaches only what the owner",
+  "has granted it, usually one folder rather than the whole pod, so a denial on",
+  "one path says nothing about another — a parent folder can be unreadable while",
+  "a folder inside it is readable. Report a denial plainly and move on; do not",
+  "retry it, and do not conclude the connector or the credential is broken.",
+  "",
+  "READS ARE LOGGED. Reading someone else's pod writes a receipt into their",
+  "access log. That is intended and visible to them. Read what you were asked",
+  "to read; do not crawl a pod to see what is there.",
+  "",
+  "A COLLECTIVE'S GRAPH. graph_query asks what a collective already holds,",
+  "across its members' contributions. Use it when the conversation touches the",
+  "collective's work, then read the documents it points to. Name the author of",
+  "what you draw on.",
+].join("\n");
+
+function buildMcpServer(identity) {
+  const server = new McpServer(
+    { name: "solid-pod-agent", version: "0.1.0" },
+    { instructions: SERVER_INSTRUCTIONS }
+  );
+
+  server.registerTool(
+    "solid_whoami",
+    {
+      description:
+        "Which identity this connector acts as: its WebID, and what its profile declares " +
+        "(storage, oidcIssuer, name; null when absent or unreadable). Pure: it does not say " +
+        "which collectives this identity belongs to or what role it holds there — read the " +
+        "collective's config.ttl for that. Writes nothing and leaves no read receipt.",
+      inputSchema: {},
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    safeHandler("solid_whoami", identity, undefined, async () => ({
+      content: [{ type: "text", text: JSON.stringify(await profile.whoami(identity), null, 2) }],
+    }))
+  );
+
+  server.registerTool(
+    "solid_read_resource",
+    {
+      description:
+        "Read a single Solid Pod file. Returns text content. Works for RDF " +
+        "documents (Turtle/JSON-LD) and text-based files. NOT for containers " +
+        "(URLs ending in \"/\") — use solid_list_container for those. When the resource " +
+        "belongs to a different pod than this identity's own, reading it " +
+        "attempts a best-effort receipt write into the owner's access-log/ " +
+        "(never blocks or fails the read, but adds a round trip — and a " +
+        "possible reauth retry — before returning). Returns two blocks: the file's " +
+        "text, then a metadata block (etag, lastModified, contentType) that is NOT " +
+        "part of the file — never copy it into the content you write elsewhere.",
+      inputSchema: { url: z.string().url() },
+    },
+    safeHandler("solid_read_resource", identity, "url", async ({ url }) => {
+      // A container is not a file, and getFile() on one gets a bare 403 from
+      // CSS even when the agent plainly has Read — a raw authenticated GET of
+      // the same URL returns 200 text/turtle (live-proved 2026-08-12). That
+      // 403 then maps to "Access denied — lacks the required WAC permission",
+      // which sends the reader off auditing ACLs that were never wrong. In
+      // Solid a container URL always ends in "/", so this is decidable
+      // up-front, without a probe request. Point at the tool that works
+      // rather than reporting a permission problem that does not exist.
+      if (url.endsWith("/")) {
+        const err = new Error(
+          "That URL is a container (it ends in \"/\"), not a file. Use " +
+            "solid_list_container with containerUrl to list what's inside it, " +
+            "then solid_read_resource on one of the resources it returns."
+        );
+        err.statusCode = 400;
+        throw err;
+      }
+      const { text, etag, lastModified, contentType } = await podClient.readFileWithVersion(url, identity.session);
+      let foreign;
+      try {
+        foreign = await isForeignResource(url, identity.webId, identity.session.fetch);
+      } catch (err) {
+        // A malformed/empty identity.webId (misconfiguration), or a pod the
+        // server would not name (podRoot.js), must not
+        // silently and permanently disable receipts with no trace — log it
+        // the same way a receipt-write failure is logged (5b.6), and skip
+        // the receipt attempt for this read rather than guessing.
+        appendAuditEntry({ label: identity.label, tool: "read_receipt", resource: url, outcome: "error" });
+        foreign = false;
+      }
+      if (foreign) {
+        try {
+          try {
+            await writeReadReceipt(
+              { resourceUrl: url, readerLabel: identity.label, readerWebId: identity.webId, outcome: "read", grantId: identity.grantId },
+              identity.session
+            );
+          } catch (err) {
+            // Same one-shot 401-retry safeHandler gives every other tool
+            // call (Story 8.5 Task 4) — a receipt write is wrapped in its
+            // own try/catch specifically so it can't abort the read, which
+            // means it was never reaching safeHandler's own retry logic.
+            // Live-verified 2026-08-02: a fresh login succeeded instantly
+            // against the same grant that the long-running session's stale
+            // 401 was failing on — the grant was fine, the session wasn't.
+            const status = err && (err.statusCode || err.status || (err.response && err.response.status));
+            if (status === 401) {
+              await reauthIdentity(identity);
+              await writeReadReceipt(
+                { resourceUrl: url, readerLabel: identity.label, readerWebId: identity.webId, outcome: "read", grantId: identity.grantId },
+                identity.session
+              );
+            } else {
+              throw err;
+            }
+          }
+        } catch (err) {
+          // Task 5b.6: a receipt-write failure must not abort or hide the
+          // read that already happened — that's exactly the case the
+          // subject needs visibility into. Report it in the connector's
+          // own journal instead of swallowing it.
+          appendAuditEntry({ label: identity.label, tool: "read_receipt", resource: url, outcome: "error" });
+        }
+      }
+      // Version headers go in a SEPARATE block, never appended to the text:
+      // a puller copies the first block verbatim into a snapshot, and a
+      // metadata line glued onto it would silently alter the member's
+      // document (ADR 006 §3: snapshots keep the original bytes).
+      const meta = { etag, lastModified, contentType };
+      return {
+        content: [
+          { type: "text", text },
+          { type: "text", text: `[metadata, not file content] ${JSON.stringify(meta)}` },
+        ],
+      };
+    })
+  );
+
+  server.registerTool(
+    "solid_write_resource",
+    {
+      description:
+        "Write/overwrite a resource at a given Pod URL. This is a BLIND REPLACE: if " +
+        "the resource already has content, that content is gone after this call. " +
+        "For adding to something rather than replacing it, use solid_append_resource " +
+        "instead — that is the default path for capture. Writing to a resource that " +
+        "does not exist yet is unceremonious (creation destroys nothing); writing to " +
+        "one that does exist replaces it and is reported here so a human can confirm " +
+        "against what is actually about to be lost, not just a URL string.",
+      inputSchema: {
+        url: z.string().url(),
+        content: z.string(),
+        contentType: z.string().default("text/turtle"),
+      },
+      // Story 8.6 Task 2: this was a blind PUT with no annotation at all —
+      // less ceremony than granting a stranger read access. Match the shape
+      // already used on the permission tools.
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
+    },
+    safeHandler("solid_write_resource", identity, "url", async ({ url, content, contentType }) => {
+      // Task 2.2/2.4: probe before writing. If it exists, report what's
+      // about to be lost. A failed probe must fail toward caution — it must
+      // never be silently treated as "the resource is new."
+      let existing = null;
+      try {
+        const file = await podClient.readFile(url, identity.session);
+        existing = await file.text();
+      } catch (err) {
+        if (!_probe404(err)) throw err;
+      }
+
+      await podClient.writeFile(url, content, contentType, identity.session);
+
+      if (existing === null) {
+        return { content: [{ type: "text", text: `Created ${url}` }] };
+      }
+      // Slice by codepoint (Array.from), not UTF-16 code unit (.slice) — a
+      // surrogate pair or combining mark straddling the cutoff would
+      // otherwise corrupt exactly the confirmation text meant to let a
+      // human catch a wrong overwrite before it happens.
+      const firstLine = Array.from(existing.split("\n")[0]).slice(0, 120).join("");
+      return {
+        content: [
+          {
+            type: "text",
+            text:
+              `Wrote ${url}, REPLACING ${Buffer.byteLength(existing, "utf-8")} bytes that started: ` +
+              `"${firstLine}"`,
+          },
+        ],
+      };
+    })
+  );
+
+  server.registerTool(
+    "solid_append_resource",
+    {
+      description:
+        "Append content to a resource at a given Pod URL — the default write path for " +
+        "capture. Read-then-append: if the resource already has content, this call adds " +
+        "to it and never replaces it; if it doesn't exist yet, it's created with just " +
+        "this content. No optimistic concurrency (no ETag/If-Match) — two concurrent " +
+        "appends to the same resource are a lost-update race, last writer wins, same " +
+        "limitation Story 7.3 recorded for the backoffice.",
+      inputSchema: {
+        url: z.string().url(),
+        content: z.string(),
+        contentType: z.string().default("text/plain"),
+      },
+    },
+    safeHandler("solid_append_resource", identity, "url", async ({ url, content, contentType }) => {
+      const result = await podClient.appendFile(url, content, contentType, identity.session);
+      const verb = result.existed ? "Appended to" : "Created";
+      return {
+        content: [
+          {
+            type: "text",
+            text: `${verb} ${url} (${result.bytesBefore} -> ${result.bytesAfter} bytes)`,
+          },
+        ],
+      };
+    })
+  );
+
+  server.registerTool(
+    "solid_delete_resource",
+    {
+      description:
+        "Delete a resource at a given Pod URL. For a container (URL ending in '/'), only " +
+        "an EMPTY container may be deleted — recursive container delete is out of scope " +
+        "here (see Story 7.7, owner-driven recursive deletion with ceremony); deleting a " +
+        "non-empty container fails loudly rather than silently doing nothing. Every delete " +
+        "is confirmed gone by re-reading the URL afterward — a 200/204 that didn't actually " +
+        "remove anything is reported as an error, never as success.",
+      inputSchema: { url: z.string().url() },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
+    },
+    safeHandler("solid_delete_resource", identity, "url", async ({ url }) => {
+      if (url.endsWith("/")) {
+        const contained = await podClient.listContainer(url, identity.session);
+        if (contained.length > 0) {
+          const err = new Error(
+            `Refusing to delete non-empty container ${url} (${contained.length} item(s) inside). ` +
+              "Recursive container delete is out of scope for this tool (Story 7.7 owns it) — " +
+              "delete the contained resources first."
+          );
+          err.statusCode = 409;
+          throw err;
+        }
+      }
+
+      await podClient.deleteResource(url, identity.session);
+
+      const gone = await podClient.confirmGone(url, identity.session);
+      if (!gone) {
+        const err = new Error(
+          `Delete of ${url} reported success but the resource is still readable — ` +
+            "this is the known silent no-op on some container deletes. Refusing to report success."
+        );
+        err.statusCode = 409;
+        throw err;
+      }
+
+      return { content: [{ type: "text", text: `Deleted ${url}` }] };
+    })
+  );
+
+  server.registerTool(
+    "solid_list_container",
+    {
+      description:
+        "List the resources directly inside a Pod container (folder URL — one " +
+        "ending in '/'). This is the ONLY way to read a folder: solid_read_resource " +
+        "cannot, and fails on one in a way that looks like a permission problem. " +
+        "Lists one level, not recursively. Takes containerUrl, not url. Each entry " +
+        "has url, isContainer, modified (ISO time) and size (bytes); modified and " +
+        "size are null when the server does not state them, which means unknown, " +
+        "not unchanged.",
+      inputSchema: { containerUrl: z.string().url() },
+    },
+    safeHandler("solid_list_container", identity, "containerUrl", async ({ containerUrl }) => {
+      const entries = await podClient.listContainerDetailed(containerUrl, identity.session);
+      return { content: [{ type: "text", text: JSON.stringify(entries, null, 2) }] };
+    })
+  );
+
+  server.registerTool(
+    "solid_get_permissions",
+    {
+      description:
+        "List which agents (WebIDs) have access EXPLICITLY GRANTED ON THIS EXACT " +
+        "resource, and what modes. Two limits worth stating before you rely on it: " +
+        "it does not show access inherited from a parent container (WAC's " +
+        "acl:default), so an empty or short result does NOT mean nobody has access " +
+        "— a resource with no ACL of its own is usually governed entirely by its " +
+        "parent; and reading permissions needs Control access, which an agent " +
+        "identity often does not have, so a denial here says nothing about whether " +
+        "it can read or write the resource itself. To find out whether an operation " +
+        "is permitted, attempt it — do not infer it from this tool.",
+      inputSchema: { resourceUrl: z.string().url() },
+    },
+    safeHandler("solid_get_permissions", identity, "resourceUrl", async ({ resourceUrl }) => {
+      const access = await wacManager.listAgentsWithAccess(resourceUrl, identity.session);
+      if (access === null) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: "Reading permissions requires Control access on this resource; this agent has read/write only.",
+            },
+          ],
+          isError: true,
+        };
+      }
+      return { content: [{ type: "text", text: JSON.stringify(access, null, 2) }] };
+    })
+  );
+
+  server.registerTool(
+    "solid_grant_access",
+    {
+      description:
+        "Grant WAC access modes (read/write/append/control) to a specific WebID on a resource. " +
+        "Works only where this identity holds Control, which in practice means its OWN pod — " +
+        "granting on someone else's pod fails by design, and that refusal is a security " +
+        "property, not a problem to work around. Typical use: publishing something this " +
+        "identity created in its own pod so a named person can read it. " +
+        "For a container, use scope 'both' so the grant covers both the container itself and " +
+        "its children (scope 'resource' alone lets the agent list the folder but not touch " +
+        "what's inside it). High-stakes — the calling agent should confirm this with the human " +
+        "before invoking it.",
+      inputSchema: {
+        resourceUrl: z.string().url(),
+        agentWebId: z.string().url(),
+        read: z.boolean().default(false),
+        write: z.boolean().default(false),
+        append: z.boolean().default(false),
+        control: z.boolean().default(false),
+        scope: z.enum(["resource", "default", "both"]).default("resource"),
+      },
+      // Hints only (spec: clients should never gate purely on these), but this
+      // is the documented way to ask a client to require explicit approval —
+      // brief §4.4 mandates it for anything that changes who-sees-what.
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
+    },
+    safeHandler("solid_grant_access", identity, "resourceUrl", async ({ resourceUrl, agentWebId, read, write, append, control, scope }) => {
+      await wacManager.grantAccess(
+        resourceUrl,
+        agentWebId,
+        { read, write, append, control },
+        identity.session,
+        { scope }
+      );
+      return {
+        content: [
+          { type: "text", text: `Updated access for ${agentWebId} on ${resourceUrl}` },
+        ],
+      };
+    })
+  );
+
+  server.registerTool(
+    "solid_revoke_access",
+    {
+      description:
+        "Revoke all WAC access for a specific WebID on a resource. Works only where this " +
+        "identity holds Control, in practice its OWN pod — it cannot revoke anyone's access " +
+        "to someone else's data, including its own. Takes effect " +
+        "immediately, including for a session already authenticated — access is " +
+        "checked per request, so there is no propagation delay to wait out. Only " +
+        "removes grants written on THIS resource: if access also comes from a " +
+        "parent container's acl:default, it survives this call and must be revoked " +
+        "there. For a container, use scope 'both' (see solid_grant_access). " +
+        "High-stakes — the calling agent should confirm this with the human before " +
+        "invoking it.",
+      inputSchema: {
+        resourceUrl: z.string().url(),
+        agentWebId: z.string().url(),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
+    },
+    safeHandler("solid_revoke_access", identity, "resourceUrl", async ({ resourceUrl, agentWebId }) => {
+      await wacManager.revokeAccess(resourceUrl, agentWebId, identity.session);
+      return {
+        content: [{ type: "text", text: `Revoked access for ${agentWebId} on ${resourceUrl}` }],
+      };
+    })
+  );
+
+  server.registerTool(
+    "solid_set_public_access",
+    {
+      description:
+        "Set (or remove) PUBLIC access to a resource — anyone on the web, logged in or not, " +
+        "with no way to know who read it. Works only where this identity holds Control, in " +
+        "practice its OWN pod — which is also where its own notes and memory may live, so " +
+        "this can expose them. Never make something public because it seemed convenient, and " +
+        "never without asking first. " +
+        "For a container, use scope 'both' (see solid_grant_access). High-stakes — the calling " +
+        "agent should confirm this with the human before invoking it.",
+      inputSchema: {
+        resourceUrl: z.string().url(),
+        read: z.boolean().default(false),
+        write: z.boolean().default(false),
+        append: z.boolean().default(false),
+        control: z.boolean().default(false),
+        scope: z.enum(["resource", "default", "both"]).default("resource"),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
+    },
+    safeHandler("solid_set_public_access", identity, "resourceUrl", async ({ resourceUrl, read, write, append, control, scope }) => {
+      await wacManager.setPublicAccess(resourceUrl, { read, write, append, control }, identity.session, {
+        scope,
+      });
+      return {
+        content: [{ type: "text", text: `Updated public access on ${resourceUrl}` }],
+      };
+    })
+  );
+
+  server.registerTool(
+    "solid_prepare_upload",
+    {
+      description:
+        "Prepare a ticketed upload for a file that ALREADY EXISTS ON DISK next to this " +
+        "agent (a screen capture, an audio message, a session transcript). Returns a " +
+        "one-time upload URL and a ready-to-run curl command that the agent runs itself " +
+        "from its own shell — the file's bytes never pass through this tool call as an " +
+        "argument. Only usable by a shell-capable client (Claude Code, a local script); " +
+        "claude.ai has no shell and cannot run the returned command — download the file " +
+        "and upload it from the backoffice instead. The ticket expires in 5 minutes, " +
+        "works exactly once, and is bound to this target URL and this identity; it " +
+        "cannot be redirected to a different URL or redeemed by anyone else. Writing to " +
+        "a resource that already exists needs overwrite: true, the same ceremony " +
+        "solid_write_resource uses.",
+      inputSchema: {
+        targetUrl: z.string().url(),
+        contentType: z.string(),
+        bytes: z.number().int().positive(),
+        overwrite: z.boolean().default(false),
+      },
+      // This call itself never writes pod data — it only mutates in-memory
+      // ticket state — so readOnlyHint is false but destructiveHint is not
+      // set here; the destructive moment is redemption at POST /upload/:token.
+      annotations: { readOnlyHint: false, idempotentHint: false },
+    },
+    safeHandler("solid_prepare_upload", identity, "targetUrl", async ({ targetUrl, contentType, bytes, overwrite }) => {
+      // Review 8.10: reject up front rather than issue a ticket that can
+      // only ever fail (413) at redemption, wasting its 5-minute window.
+      if (bytes > UPLOAD_MAX_BYTES) {
+        return {
+          isError: true,
+          content: [
+            { type: "text", text: `${bytes} bytes exceeds the upload cap of ${UPLOAD_MAX_BYTES} bytes. No ticket was issued.` },
+          ],
+        };
+      }
+
+      // AC3: probe before issuing. A failed probe must fail toward caution —
+      // never silently treated as "new" — so a non-404 error propagates and
+      // safeHandler turns it into an error result with no ticket issued.
+      let existing = null;
+      try {
+        const file = await podClient.readFile(targetUrl, identity.session);
+        existing = await file.text();
+      } catch (err) {
+        if (!_probe404(err)) throw err;
+      }
+
+      if (existing !== null && !overwrite) {
+        const firstLine = Array.from(existing.split("\n")[0]).slice(0, 120).join("");
+        return {
+          content: [
+            {
+              type: "text",
+              text:
+                `${targetUrl} already exists (${Buffer.byteLength(existing, "utf-8")} bytes, starting ` +
+                `"${firstLine}"). Call again with overwrite: true to replace it — no ticket was issued.`,
+            },
+          ],
+        };
+      }
+
+      const ticket = uploadTickets.createTicket({ targetUrl, identity, contentType, bytes, overwrite });
+      appendAuditEntry({ label: identity.label, tool: "upload_prepared", resource: targetUrl, outcome: "ok" });
+      const uploadUrl = new URL(`/upload/${ticket.token}`, UPLOAD_PUBLIC_BASE).toString();
+      const overwriteNote =
+        existing !== null
+          ? ` This REPLACES ${Buffer.byteLength(existing, "utf-8")} existing bytes at that URL.`
+          : "";
+
+      return {
+        content: [
+          {
+            type: "text",
+            text:
+              `Upload ticket ready, expires in ${ticket.expiresIn}s, single-use.${overwriteNote}\n` +
+              "The URL below is a one-time credential — run the command, don't paste the URL " +
+              "anywhere else:\n" +
+              `curl --data-binary @<path-to-file> ${uploadUrl}`,
+          },
+        ],
+      };
+    })
+  );
+
+  server.registerTool(
+    "graph_query",
+    {
+      description:
+        "Ask a collective's knowledge graph (read-only SPARQL 1.1: SELECT, ASK, CONSTRUCT, DESCRIBE). " +
+        "The graph holds what the collective's agent pulled and confronted from its members: one named " +
+        "graph per document, named by that document's pod address, so `GRAPH ?g { … }` tells you where " +
+        "each fact came from. Answers only for the collective's own agent, a member, or a member's declared agent, " +
+        "and only over folders this identity can read on the collective's pod. The graph is a catalogue: " +
+        "for a document's full text, read ?g with solid_read_resource. SERVICE and updates are refused; " +
+        `a SELECT returns at most ${collectiveGraph.MAX_ROWS} rows.`,
+      inputSchema: {
+        collective: z.string().url().describe("The collective's address: its config.ttl, or its IRI (…/config.ttl#name)."),
+        query: z.string().min(1).describe("A SPARQL 1.1 query."),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    safeHandler("graph_query", identity, "collective", async (args) => ({
+      content: [{ type: "text", text: await collectiveGraph.queryGraph(args, identity) }],
+    }))
+  );
+
+  server.registerTool(
+    "graph_ingest",
+    {
+      description:
+        "Load Turtle from a collective's pod into its knowledge graph. Only the collective's own agent may " +
+        "do this, and only for documents under the collective's depots/ or confrontations/. Give one .ttl " +
+        "document, or a folder to load every .ttl under it. Each document replaces its own named graph, so " +
+        "ingesting again after a change is safe. Markdown and other files are not loaded: their Turtle " +
+        "sidecar is what enters the graph.",
+      inputSchema: {
+        collective: z.string().url().describe("The collective's address: its config.ttl, or its IRI (…/config.ttl#name)."),
+        url: z.string().url().describe("A .ttl document, or a folder ending in /, under depots/ or confrontations/."),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
+    },
+    safeHandler("graph_ingest", identity, "url", async (args) => ({
+      content: [{ type: "text", text: await collectiveGraph.ingest(args, identity) }],
+    }))
+  );
+
+  return server;
+}
+
+/**
+ * Log a single identity in and return the Map-entry shape both bootIdentities
+ * and the lazy path (resolveIdentity, Story 8.6.1) store. Factored out so
+ * there is exactly one place that creates a session and cross-checks webId —
+ * two copies would drift (8.6.1 Task 1.2). Throws on any failure; it is the
+ * caller's job to decide what a failure means (boot: fatal; lazy: a miss).
+ *
+ * @param {{clientId:string, clientSecret:string, webId:string, label:string}} id
+ * @returns {Promise<{session:object, label:string, webId:string, clientId:string, clientSecret:string}>}
+ */
+async function loginIdentity(id) {
+  const session = await getAgentSession({
+    clientId: id.clientId,
+    clientSecret: id.clientSecret,
+    oidcIssuer: process.env.SOLID_OIDC_ISSUER,
+    keepAlive: true,
+  });
+
+  if (session.info.webId !== id.webId) {
+    // Defensive: catches a stale/typo'd webId in identities.json before it
+    // causes confusing tool errors later.
+    throw new Error(
+      `identity "${id.label}" logged in as ${session.info.webId}, not the ` +
+        `configured webId. Fix identities.json.`
+    );
+  }
+
+  // auth.js already logs "authenticated as <webId>" per login. That alone
+  // can't be correlated to a person when N identities boot, so name the
+  // label here too — label and WebID are both safe to log (AC7); the slug,
+  // client id and secret are not.
+  // eslint-disable-next-line no-console
+  console.log(
+    `[solid-pod-agent mcp-server] identity "${id.label}" ready as ${session.info.webId}`
+  );
+
+  // clientId/clientSecret are kept in-memory only, never logged, so Task
+  // 4's one-shot re-auth-on-401 can re-login this identity later without
+  // re-reading identities.json.
+  return {
+    session,
+    label: id.label,
+    webId: session.info.webId,
+    clientId: id.clientId,
+    clientSecret: id.clientSecret,
+    // Story 7.9 AC13: non-secret, safe to write into another person's pod
+    // via a receipt. null for identities that predate 7.9 (loadIdentities
+    // defaults it there).
+    grantId: id.grantId || null,
+  };
+}
+
+/**
+ * Boot every configured identity's Solid session, once, at startup.
+ * Story 8.3 AC3: N identities, each logged in with keepAlive:true and
+ * reused for the process lifetime. AC3: if ANY identity fails to log in,
+ * the whole process refuses to start — a half-authenticated server that
+ * silently serves 3 of 4 people is worse than one that refuses to start.
+ *
+ * Story 8.6.1: this eager, fail-fast boot loop stays exactly as strict as
+ * before. It coexists with the lazy path (resolveIdentity, below) rather
+ * than being replaced by it — collapsing the two into "just lazy-load
+ * everything" would silently turn a broken configured identity from a
+ * refused startup into a partial, half-authenticated server (the exact
+ * failure mode AC3 was written to prevent). Lazy loading only ever covers
+ * identities *not* present in identities.json at boot time.
+ *
+ * @returns {Promise<Map<string, {session: object, label: string, webId: string}>>}
+ */
+async function bootIdentities() {
+  const configured = loadIdentities();
+  const identities = new Map();
+
+  for (const [slug, id] of configured) {
+    let entry;
+    try {
+      entry = await loginIdentity(id);
+    } catch (err) {
+      // Story 8.7 (live outage 2026-09-24): this used to process.exit(1). One
+      // teammate deleting a credential in the backoffice (invalid_client) then
+      // crash-looped the connector for everyone at the next restart. Skip it
+      // instead: the slug falls through to the lazy path, which fails that
+      // one person's requests cleanly and retries once the entry is fixed.
+      // eslint-disable-next-line no-console
+      console.error(
+        `[solid-pod-agent mcp-server] Solid login failed for identity "${id.label}" — skipped at boot, other identities unaffected:`,
+        err.message
+      );
+      continue;
+    }
+    identities.set(slug, entry);
+  }
+
+  if (identities.size === 0) {
+    // Legitimate since Story 7.9: every identity may be revoked. Boot anyway
+    // so /onboard/ stays reachable and a replacement can be minted — refusing
+    // to start here would be a deadlock, since the mint endpoint is served by
+    // this same process (live outage, 2026-08-12).
+    // eslint-disable-next-line no-console
+    console.warn(
+      "[solid-pod-agent mcp-server] no active identities configured — serving /onboard/ only. " +
+        "Mint one from the backoffice (People & apps -> Claude connector access)."
+    );
+  }
+
+  return identities;
+}
+
+// Story 8.6.1 Task 3.2: a failed lazy load (slug not configured, or
+// configured but credentials/webId are bad) is negatively cached for a short
+// TTL so a slug-guessing loop cannot drive one file read + one CSS login
+// attempt per guess (the amplification trap the Dev Notes call out). A
+// guess against a cached-negative slug costs a Map lookup, same as today.
+const NEGATIVE_CACHE_TTL_MS = 30 * 1000;
+const negativeLookupCache = new Map(); // slug -> expiry timestamp (ms)
+
+// Review fix (8.6.1): without a sweep, a sustained guessing campaign against
+// many distinct fake slugs grows this Map without bound — expired entries
+// were only ever removed by a later successful login for that same slug.
+// `unref()` so this interval never keeps the process alive on its own.
+setInterval(() => {
+  const now = Date.now();
+  for (const [slug, expiry] of negativeLookupCache) {
+    if (expiry <= now) negativeLookupCache.delete(slug);
+  }
+}, NEGATIVE_CACHE_TTL_MS).unref();
+
+// Story 8.6.1 Task 4: de-duplicate concurrent first-requests for the same
+// new slug so two simultaneous requests share one in-flight login instead of
+// racing two separate sessions into existence for one identity.
+const inFlightLogins = new Map(); // slug -> Promise<entry|null>
+
+/**
+ * Resolve a slug to its identity entry, lazily logging in and caching on a
+ * miss (Story 8.6.1). Known slugs never touch the filesystem (AC3) — this is
+ * a bare Map.get for the hot path, only falling through to a re-read of
+ * identities.json when the slug isn't already cached.
+ *
+ * @param {Map<string, object>} identities the shared, mutable boot-time Map
+ * @param {string} slug
+ * @returns {Promise<object|null>} the identity entry, or null if the slug is
+ *   not a real identity (unknown, or a real one whose login just failed) —
+ *   the route handler treats both identically (AC4: no slug oracle).
+ */
+async function resolveIdentity(identities, slug) {
+  const cached = identities.get(slug);
+  if (cached) return cached;
+
+  const negativeUntil = negativeLookupCache.get(slug);
+  if (negativeUntil && negativeUntil > Date.now()) return null;
+
+  const inFlight = inFlightLogins.get(slug);
+  if (inFlight) return inFlight;
+
+  const attempt = (async () => {
+    let configured;
+    try {
+      configured = loadIdentities();
+    } catch (err) {
+      // A malformed identities.json (e.g. someone mid-edit) must not crash
+      // an in-flight request — treat it the same as "slug not found" and
+      // let the next lazy lookup re-read once the file is fixed. Still log
+      // it (never the slug, AC7) so a broken config isn't invisible.
+      // eslint-disable-next-line no-console
+      console.error(
+        "[solid-pod-agent mcp-server] lazy identity resolution: failed to load identities.json:",
+        err.message
+      );
+      negativeLookupCache.set(slug, Date.now() + NEGATIVE_CACHE_TTL_MS);
+      return null;
+    }
+
+    const id = configured.get(slug);
+    if (!id) {
+      negativeLookupCache.set(slug, Date.now() + NEGATIVE_CACHE_TTL_MS);
+      return null;
+    }
+
+    let entry;
+    try {
+      entry = await loginIdentity(id);
+    } catch (err) {
+      // Never log the slug (AC7/Task 3.4) — id.label is safe, same as boot.
+      // eslint-disable-next-line no-console
+      console.error(
+        `[solid-pod-agent mcp-server] lazy login failed for identity "${id.label}":`,
+        err.message
+      );
+      negativeLookupCache.set(slug, Date.now() + NEGATIVE_CACHE_TTL_MS);
+      return null;
+    }
+
+    identities.set(slug, entry);
+    negativeLookupCache.delete(slug);
+    return entry;
+  })();
+
+  inFlightLogins.set(slug, attempt);
+  try {
+    return await attempt;
+  } finally {
+    // Clearing on both success and failure means a rejected/negative
+    // in-flight login does not permanently poison the slug until restart
+    // (Task 4.2) — the next request tries again, subject only to the
+    // negative-cache TTL above.
+    inFlightLogins.delete(slug);
+  }
+}
+
+// Story 7.9 AC14: lastUsedAt is maintained through the same validated
+// atomic write path as everything else, coalesced to at most one write per
+// identity per LAST_USED_FLUSH_MS, and never blocking a request — a failed
+// bookkeeping write is logged and swallowed, exactly as receipt writing is
+// best-effort today. A bookkeeping write may never be the reason
+// identities.json becomes unloadable, so failures here never propagate.
+const LAST_USED_FLUSH_MS = 5 * 60 * 1000;
+const dirtySlugs = new Map(); // slug -> most recent Date.now() seen since last flush
+
+function markSlugUsed(slug) {
+  dirtySlugs.set(slug, Date.now());
+}
+
+setInterval(() => {
+  if (dirtySlugs.size === 0) return;
+  const { updateIdentity } = require("./identityRegistry");
+  const batch = [...dirtySlugs.entries()];
+  dirtySlugs.clear();
+  for (const [slug, seenAt] of batch) {
+    updateIdentity(slug, { lastUsedAt: new Date(seenAt).toISOString() }).catch((err) => {
+      // eslint-disable-next-line no-console
+      console.error(`[solid-pod-agent mcp-server] lastUsedAt write failed for a slug (non-fatal):`, err.message);
+    });
+  }
+}, LAST_USED_FLUSH_MS).unref();
+
+/**
+ * Story 8.5 Task 4: on a 401 that indicates the process-lifetime Solid
+ * session has died (token revoked/expired despite `keepAlive`), re-login
+ * once for that identity and mutate `identity.session` in place so every
+ * holder of the shared `identities` Map — including /healthz and the next
+ * request's freshly-built tool server — immediately sees the new session.
+ * Bounded to exactly one attempt by construction: this function is only
+ * ever called once per failed call, from inside safeHandler's single retry
+ * branch (see below) — there is no loop here or in the caller.
+ */
+async function reauthIdentity(identity) {
+  // eslint-disable-next-line no-console
+  console.log(
+    `[solid-pod-agent mcp-server] session for identity "${identity.label}" looks expired (401) — re-authenticating once`
+  );
+  let session;
+  try {
+    session = await getAgentSession({
+      clientId: identity.clientId,
+      clientSecret: identity.clientSecret,
+      oidcIssuer: process.env.SOLID_OIDC_ISSUER,
+      keepAlive: true,
+    });
+  } catch (err) {
+    // Story 8.7: /healthz reads this flag. A failed re-login is the only
+    // real "dead credential" signal — an expired token alone is not (see
+    // /healthz).
+    identity.authBroken = true;
+    throw err;
+  }
+  identity.authBroken = false;
+  identity.session = session;
+  return session;
+}
+
+async function main() {
+  const identities = await bootIdentities();
+
+  const app = createMcpExpressApp({ host: HOST, allowedHosts: ALLOWED_HOSTS });
+
+  // AC4.2: exactly one proxy hop (nginx-gateway) sits in front of this, so
+  // trust exactly one. `true` would trust the whole X-Forwarded-For chain,
+  // which a caller can forge — every attacker would then get to pick their
+  // own rate-limit bucket, and the limiter below would be decorative.
+  app.set("trust proxy", 1);
+
+  // AC4.4: bound how long a single request may occupy a transport+server
+  // pair. Fires only if nothing has been sent yet. Story 8.10 Task 4.3:
+  // scoped to /mcp only — a bare app.use() here previously applied to every
+  // route including /upload/:token, and 55s is far too short for a 25MB
+  // body over a slow link. /upload/:token gets its own, longer timeout
+  // reconciled against nginx's proxy_read_timeout for that location.
+  app.use("/mcp", (req, res, next) => {
+    res.setTimeout(REQUEST_TIMEOUT_MS, () => {
+      if (!res.headersSent) {
+        res.status(504).json({
+          jsonrpc: "2.0",
+          error: { code: -32001, message: "Request timed out." },
+          id: null,
+        });
+      }
+    });
+    next();
+  });
+
+  // Stateless mode: a fresh transport + server per request. There is no
+  // session to disambiguate concurrent clients in stateless mode, so a
+  // single shared transport would let concurrent requests interleave state
+  // incorrectly — see Dev Notes "Concurrency trap". The cost (re-registering
+  // 10 tool definitions per call) is trivial. Story 8.3: the slug in the path
+  // picks which identity's already-authenticated session backs this request.
+  // AC4: reveal nothing about whether a slug exists, how many identities are
+  // configured, or any WebID. Do not log the attempted slug — it may be a
+  // near-miss of a real secret URL, and logging it would copy that secret
+  // into the log file.
+  const notFound = (req, res) => {
+    // eslint-disable-next-line no-console
+    console.warn("[solid-pod-agent mcp-server] rejected request to unknown MCP slug");
+    res.status(404).json({
+      jsonrpc: "2.0",
+      error: { code: -32601, message: "Not found." },
+      id: null,
+    });
+  };
+
+  // AC4.3. Two independent stores, both keyed on client IP (via `trust
+  // proxy: 1` above, so this is the real caller and not the nginx
+  // container). Separate stores matter: if unknown-slug guesses shared the
+  // valid-traffic bucket, a guessing attacker could exhaust a legitimate
+  // user's budget and lock them out.
+  const mcpLimiter = rateLimit({
+    windowMs: RATE_LIMIT_WINDOW_MS,
+    limit: RATE_LIMIT_MAX,
+    standardHeaders: "draft-7",
+    legacyHeaders: false,
+    handler: rateLimitHandler,
+  });
+
+  // Tighter, because guessing a 22-char slug is the only reason to hit this
+  // path repeatedly — there is no legitimate high-volume use of a wrong URL.
+  // No standardHeaders here: this limiter guards the guessing path, and
+  // RateLimit-Policy/RateLimit would hand a slug-guesser exact remaining-quota
+  // telemetry to pace their guesses just under the threshold.
+  const unknownSlugLimiter = rateLimit({
+    windowMs: RATE_LIMIT_WINDOW_MS,
+    limit: RATE_LIMIT_MAX_UNKNOWN,
+    standardHeaders: false,
+    legacyHeaders: false,
+    handler: rateLimitHandler,
+  });
+
+  app.use("/mcp", mcpLimiter);
+
+  // Story 7.9: mounted OUTSIDE the /mcp router so its rate limiter and auth
+  // model are independent (AC2.1). Shares the SAME `identities` Map instance
+  // bootIdentities() returned, so a revoke's cache eviction (AC11c) and a
+  // mint's lazy pickup (AC15) are visible to /mcp/:slug without a restart.
+  app.use("/onboard", buildOnboardRouter(identities));
+
+  // Story 8.10 Task 3: a THIRD independent surface (mcp-server.js:1007's
+  // precedent — /mcp/:slug, /onboard, now /upload/:token — three genuinely
+  // separate auth models, never collapsed into one). Own rate-limit bucket:
+  // uploads are low-count/high-bytes, the opposite shape of both mcpLimiter
+  // and unknownSlugLimiter, so sharing either budget describes neither
+  // traffic pattern. Own raw-body parser scoped to this one route only —
+  // the 100kb express.json() ceiling registered inside createMcpExpressApp
+  // never applies here, because this route never reaches that parser.
+  const uploadLimiter = rateLimit({
+    windowMs: RATE_LIMIT_WINDOW_MS,
+    limit: parsePositiveInt("UPLOAD_RATE_LIMIT_MAX", process.env.UPLOAD_RATE_LIMIT_MAX, 20),
+    standardHeaders: false,
+    legacyHeaders: false,
+    handler: rateLimitHandler,
+  });
+
+  app.post(
+    "/upload/:token",
+    uploadLimiter,
+    (req, res, next) => {
+      // Task 4.3: a 25MB body over a slow link legitimately takes longer
+      // than the /mcp path's 55s budget. Sits just under nginx's
+      // location-scoped proxy_read_timeout (see 11-solid-mcp.conf) for the
+      // same reason REQUEST_TIMEOUT_MS is set just under the server-level
+      // one — this side should give the tidier JSON error, not nginx's 504.
+      res.setTimeout(UPLOAD_REQUEST_TIMEOUT_MS, () => {
+        if (!res.headersSent) {
+          res.status(504).json({ error: "Upload timed out." });
+        }
+      });
+      next();
+    },
+    // Review 8.10: reject an unknown/expired token before the raw-body
+    // parser buffers up to UPLOAD_MAX_BYTES for a request that can never
+    // succeed. This is a peek, not a consume — the real (single-use)
+    // redemption still happens below, after the length check passes.
+    (req, res, next) => {
+      if (!uploadTickets.peekTicket(req.params.token)) {
+        res.status(404).json({ error: "Not found." });
+        return;
+      }
+      next();
+    },
+    express.raw({ type: "*/*", limit: UPLOAD_MAX_BYTES }),
+    async (req, res) => {
+      // AC10: unknown/expired/replayed token all get the same generic
+      // shape as the /mcp/:slug 404 path — no oracle on which case it was —
+      // and the attempted token is never logged (Task 3.5).
+      const ticket = uploadTickets.peekTicket(req.params.token);
+      if (!ticket) {
+        res.status(404).json({ error: "Not found." });
+        return;
+      }
+
+      const buffer = Buffer.isBuffer(req.body) ? req.body : Buffer.from(req.body || "");
+
+      // AC6/Task 3.4: verify length BEFORE any pod write. A client dying
+      // mid-transfer, or a caller lying about `bytes`, must never leave a
+      // truncated write at the real URL — pods have no versioning to
+      // recover from that. On mismatch the pod stays byte-identical to
+      // before this request. Review 8.10: the ticket is NOT consumed here —
+      // a caller who mis-declared `bytes` gets to retry within the same
+      // window instead of losing the ticket on one bad attempt. The
+      // response omits the exact byte count so this path isn't a precise
+      // size oracle on top of confirming the token is live.
+      if (buffer.length !== ticket.bytes) {
+        appendAuditEntry({
+          label: ticket.identity.label,
+          tool: "upload_completed",
+          resource: ticket.targetUrl,
+          outcome: "error",
+        });
+        res.status(400).json({
+          error: "Body length did not match the ticket. Nothing was written; the ticket is still valid.",
+        });
+        return;
+      }
+
+      // Review 8.10 (TOCTOU): AC3's existence probe ran at issue time, up
+      // to 5 minutes before this redemption. Re-probe now, right before the
+      // write, so a target that was created/changed in the gap is caught
+      // by the same overwrite ceremony rather than being silently
+      // clobbered. This does consume the ticket even on rejection — the
+      // ticket's premise (the state it was issued against) no longer
+      // holds, so re-issuing (a fresh probe) is the correct next step, not
+      // a retry of this one.
+      uploadTickets.consumeTicket(req.params.token);
+      if (!ticket.overwrite) {
+        try {
+          await podClient.readFile(ticket.targetUrl, ticket.identity.session);
+          appendAuditEntry({
+            label: ticket.identity.label,
+            tool: "upload_completed",
+            resource: ticket.targetUrl,
+            outcome: "error",
+          });
+          res.status(409).json({
+            error: "Target now exists and this ticket was not issued with overwrite. Call solid_prepare_upload again.",
+          });
+          return;
+        } catch (err) {
+          if (!_probe404(err)) {
+            appendAuditEntry({
+              label: ticket.identity.label,
+              tool: "upload_completed",
+              resource: ticket.targetUrl,
+              outcome: "error",
+            });
+            const result = toToolErrorResult(err);
+            res.status(502).json({ error: result.content[0].text });
+            return;
+          }
+          // still absent, as expected — proceed to write
+        }
+      }
+
+      try {
+        await podClient.writeFile(ticket.targetUrl, buffer, ticket.contentType, ticket.identity.session);
+      } catch (err) {
+        appendAuditEntry({
+          label: ticket.identity.label,
+          tool: "upload_completed",
+          resource: ticket.targetUrl,
+          outcome: "error",
+        });
+        const result = toToolErrorResult(err);
+        res.status(502).json({ error: result.content[0].text });
+        return;
+      }
+
+      appendAuditEntry({
+        label: ticket.identity.label,
+        tool: "upload_completed",
+        resource: ticket.targetUrl,
+        outcome: "ok",
+      });
+      res.status(200).json({ ok: true, url: ticket.targetUrl });
+    }
+  );
+
+  const handleMcpRequest = async (req, res, identity) => {
+    const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+    const server = buildMcpServer(identity);
+
+    res.on("close", () => {
+      transport.close();
+      server.close();
+    });
+
+    try {
+      await server.connect(transport);
+      await transport.handleRequest(req, res, req.body);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error("[solid-pod-agent mcp-server] request handling error:", err.message);
+      if (!res.headersSent) {
+        res.status(500).json({
+          jsonrpc: "2.0",
+          error: { code: -32603, message: "Internal server error" },
+          id: null,
+        });
+      }
+    }
+  };
+
+  app.post("/mcp/:slug", async (req, res) => {
+    const slug = req.params.slug;
+
+    // Known slugs never touch the filesystem (AC3) — a bare Map hit skips
+    // the limiter entirely, same as before.
+    const cached = identities.get(slug);
+    if (cached) {
+      markSlugUsed(slug);
+      await handleMcpRequest(req, res, cached);
+      return;
+    }
+
+    // Story 8.6.1 review fix (AC6): the slug isn't cached yet, so resolving
+    // it may cost a file read plus a real outbound OIDC login attempt — gate
+    // that cost behind the tight unknownSlugLimiter BEFORE paying it, not
+    // just before the eventual 404. Gating only the 404 (as originally
+    // shipped) let a slug-guessing loop ride the loose 120/min mcpLimiter
+    // budget for the expensive part instead of the intended 10/min one.
+    unknownSlugLimiter(req, res, async () => {
+      const identity = await resolveIdentity(identities, slug);
+      if (!identity) {
+        notFound(req, res);
+        return;
+      }
+      markSlugUsed(slug);
+      await handleMcpRequest(req, res, identity);
+    });
+  });
+
+  // Stateless mode has no SSE stream or session to tear down, so GET/DELETE
+  // are not meaningful requests here.
+  const notSupported = (req, res) => {
+    res.status(405).json({
+      jsonrpc: "2.0",
+      error: { code: -32000, message: "Method not allowed. This server is stateless." },
+      id: null,
+    });
+  };
+  // Route through the tighter limiter first: GET/DELETE on an unknown slug is
+  // the same guessing surface as POST, and without this it ran at the loose
+  // 120/min budget regardless of slug validity.
+  app.get("/mcp/:slug", (req, res) => {
+    if (!identities.has(req.params.slug)) {
+      unknownSlugLimiter(req, res, () => notSupported(req, res));
+      return;
+    }
+    notSupported(req, res);
+  });
+  app.delete("/mcp/:slug", (req, res) => {
+    if (!identities.has(req.params.slug)) {
+      unknownSlugLimiter(req, res, () => notSupported(req, res));
+      return;
+    }
+    notSupported(req, res);
+  });
+
+  // A request to bare /mcp (8.2's removed endpoint) or /mcp/ with an empty
+  // slug segment matches no :slug route, so without this it would fall
+  // through to Express's default HTML 404 — a different response shape than
+  // the unknown-slug path, which is itself a signal. AC4 says every miss on
+  // this surface reveals nothing, so give them all the same generic body.
+  // These are miss paths too, so they get the tighter budget for the same
+  // reason the unknown-slug path does.
+  app.all("/mcp", (req, res) => unknownSlugLimiter(req, res, () => notFound(req, res)));
+  app.all("/mcp/", (req, res) => unknownSlugLimiter(req, res, () => notFound(req, res)));
+
+  // Unauthenticated health check for the Docker/nginx checks. Story 8.4 AC8:
+  // 8.2 shipped a static {ok:true} and both 8.2 and 8.3's reviews deferred
+  // the decision here — a compose healthcheck backed by a static value
+  // reports healthy even when every Solid session has died. Decided:
+  // session-aware, using the same `session.info.isLoggedIn` auth.js already
+  // checks right after login. Aggregate boolean only — never a per-identity
+  // breakdown, WebID, or identity count. This endpoint is public as of 8.4,
+  // and none of those is something to hand out anonymously; "some session
+  // is dead" is operationally useful, "which one" is not something an
+  // unauthenticated caller needs. `isLoggedIn` reflects the SDK's own
+  // client-side state (flips false on an expired/revoked token it has
+  // noticed, not necessarily the instant CSS invalidates it) — a
+  // best-effort liveness signal, not a live round-trip to CSS on every poll
+  // (that would turn a 15s healthcheck into 15s-interval load against CSS
+  // for a value that mostly doesn't change).
+  // Deliberately NOT rate-limited and deliberately outside /mcp: the Docker
+  // healthcheck polls it every 15s, and a limiter here would eventually mark
+  // a perfectly healthy container unhealthy and restart it.
+  app.get("/healthz", (req, res) => {
+    let allSessionsAlive;
+    try {
+      // Story 8.4 originally treated "zero identities" as unhealthy, to catch
+      // a missing/unreadable identities.json. Since Story 7.9 that check
+      // would also mark a legitimately all-revoked deployment permanently
+      // unhealthy while it is running perfectly well and serving /onboard/
+      // so a replacement can be minted. The missing/unreadable-file cases
+      // still fail loudly at boot (loadIdentities throws), so nothing is
+      // hidden by dropping the size check here: this endpoint's job is
+      // "are the sessions I hold alive", and holding none is a true answer.
+      // Story 8.7 fix: this used to check `session.info.isLoggedIn`. Client-
+      // credentials tokens last 10 min with no refresh token, so keepAlive
+      // cannot renew them: every identity idle >10 min flips isLoggedIn
+      // false and is re-logged in on its next request's 401 (working as
+      // designed). Checking it made /healthz 503 from ~10 min after boot,
+      // permanently (live 2026-09-24: 25 days unhealthy while serving fine).
+      // Unhealthy now means a re-login was attempted and failed.
+      allSessionsAlive = [...identities.values()].every(
+        (identity) => !identity.authBroken
+      );
+    } catch (err) {
+      // Any unexpected shape (session field missing, SDK throw) means we
+      // can't confirm liveness — treat as unhealthy rather than 500ing.
+      // eslint-disable-next-line no-console
+      console.error("[solid-pod-agent mcp-server] /healthz check failed:", err.message);
+      allSessionsAlive = false;
+    }
+    res.status(allSessionsAlive ? 200 : 503).json({ ok: allSessionsAlive });
+  });
+
+  app.listen(PORT, HOST, () => {
+    // eslint-disable-next-line no-console
+    console.log(
+      `[solid-pod-agent mcp-server] listening on http://${HOST}:${PORT}/mcp/<slug> ` +
+        `(${identities.size} ${identities.size === 1 ? "identity" : "identities"} configured)`
+    );
+  });
+}
+
+main().catch((err) => {
+  // eslint-disable-next-line no-console
+  console.error("[solid-pod-agent mcp-server] fatal:", err.message);
+  process.exit(1);
+});

@@ -1,0 +1,113 @@
+{
+  "@context": [
+    "https://linkedsoftwaredependencies.org/bundles/npm/@solid/community-server/^7.0.0/components/context.jsonld",
+    "https://linkedsoftwaredependencies.org/bundles/npm/@solid-css-overlay/pod-name-guard/^1.0.0/components/context.jsonld"
+  ],
+  "import": [
+    "css:config/app/init/initialize-intro.json",
+    "css:config/app/main/default.json",
+    "css:config/app/variables/default.json",
+    "css:config/http/handler/default.json",
+    "css:config/http/middleware/default.json",
+    "css:config/http/notifications/all.json",
+    "css:config/http/server-factory/http.json",
+    "css:config/http/static/default.json",
+    "css:config/identity/access/public.json",
+    "css:config/identity/email/default.json",
+    "css:config/identity/handler/default.json",
+    "css:config/identity/oidc/default.json",
+    "css:config/identity/ownership/token.json",
+    "css:config/identity/pod/static.json",
+    "css:config/ldp/authentication/dpop-bearer.json",
+    "css:config/ldp/authorization/webacl.json",
+    "css:config/ldp/handler/default.json",
+    "css:config/ldp/metadata-parser/default.json",
+    "css:config/ldp/metadata-writer/default.json",
+    "css:config/ldp/modes/default.json",
+    "css:config/storage/backend/file.json",
+    "css:config/storage/key-value/resource-store.json",
+    "css:config/storage/location/pod.json",
+    "css:config/storage/middleware/default.json",
+    "css:config/util/auxiliary/acl.json",
+    "css:config/util/index/default.json",
+    "css:config/util/logging/winston.json",
+    "css:config/util/representation-conversion/default.json",
+    "css:config/util/resource-locker/file.json",
+    "css:config/util/variables/default.json"
+  ],
+  "@graph": [
+    {
+      "comment": [
+        "The image's default: stock css:config/file.json, with three changes. Everything else is stock.",
+        "1. Pods are subdomains (alice.example.org), not folders (example.org/alice/). Decided for every NEW",
+        "   instance (2026-10-14). NEVER switch an instance that already has folder pods: with the file backend,",
+        "   subdomain mode reads data/alice/ as alice.example.org and moves the root to data/www/, so every",
+        "   existing WebID, ACL and link would point at something else. Such an instance mounts",
+        "   config/suffix.json instead (pocpod0 does).",
+        "2. The welcome page is the root container's index.html, written once on first start",
+        "   (initialize-intro.json; the image puts our welcome where the stock intro page was). NOT",
+        "   static-root.json: CSS 7.2's StaticAssetHandler matches the path and ignores the host, so with",
+        "   subdomain pods it answered GET / on EVERY pod with the welcome page, Turtle requests included,",
+        "   and no app could read a pod's root (checked against the image, 2026-10-14).",
+        "3. Authentication is stock dpop-bearer. pocpod0's UnsecureWebIdExtractor (trusts an unverified",
+        "   'Authorization: WebID' header) never enters the image; an instance that needs it adds it in its",
+        "   own config, knowingly, and strips the header at its gateway."
+      ]
+    },
+    {
+      "comment": "util/identifiers/subdomain.json, restated rather than imported so the generator can be wrapped.",
+      "@id": "urn:solid-server:default:IdentifierStrategy",
+      "@type": "SubdomainIdentifierStrategy",
+      "baseUrl": { "@id": "urn:solid-server:default:variable:baseUrl" }
+    },
+    {
+      "comment": [
+        "Pod names become hostnames; CSS checks only that they are non-empty. PodNameGuard (pod-name-guard/",
+        "in this repo) answers 400 for a name that is not a valid DNS label after CSS's own clean-up",
+        "(open_fab, 64+ characters, a hyphen at either end) and for reserved names. Reserve here every",
+        "service host the gateway serves on this domain, or a pod of that name exists but is unreachable.",
+        "An instance with more service hosts mounts its own copy of this file with a longer list."
+      ],
+      "@id": "urn:solid-server:default:IdentifierGenerator",
+      "@type": "PodNameGuard",
+      "source": {
+        "@id": "urn:solid-server:overlay:SubdomainIdentifierGenerator",
+        "@type": "SubdomainIdentifierGenerator",
+        "baseUrl": { "@id": "urn:solid-server:default:variable:baseUrl" }
+      },
+      "reserved": [ "www", "mcp", "api", "pod", "pods", "mail", "smtp", "admin", "backoffice", "oxigraph", "static", "assets", "auth", "login", "account", "idp", "status" ]
+    },
+    {
+      "comment": "util/identifiers/subdomain.json: www is the folder the bare domain is stored in (data/www/).",
+      "@id": "urn:solid-server:default:FileIdentifierMapper",
+      "@type": "SubdomainExtensionBasedMapper",
+      "base": { "@id": "urn:solid-server:default:variable:baseUrl" },
+      "rootFilepath": { "@id": "urn:solid-server:default:variable:rootFilePath" },
+      "baseSubdomain": "www"
+    },
+    {
+      "comment": [
+        "The public .md page (solid-kit's doc-view, overlay/doc-view/, generated): main.html.ejs loads these.",
+        "Matched on the path only, like every static asset, so they also answer on each pod's subdomain:",
+        "a pod resource named /doc-view.js or /doc-view.css would be hidden. The rest of the overlay is",
+        "under CSS's own /.well-known/css/ and needs no entry here."
+      ],
+      "@id": "urn:solid-server:default:StaticAssetHandler",
+      "@type": "StaticAssetHandler",
+      "assets": [
+        {
+          "@id": "urn:solid-server:overlay:DocViewScriptAsset",
+          "@type": "StaticAssetEntry",
+          "relativeUrl": "/doc-view.js",
+          "filePath": "@css:templates/doc-view/doc-view.js"
+        },
+        {
+          "@id": "urn:solid-server:overlay:DocViewStyleAsset",
+          "@type": "StaticAssetEntry",
+          "relativeUrl": "/doc-view.css",
+          "filePath": "@css:templates/doc-view/doc-view.css"
+        }
+      ]
+    }
+  ]
+}

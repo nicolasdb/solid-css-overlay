@@ -1,0 +1,71 @@
+{
+  "@context": "https://linkedsoftwaredependencies.org/bundles/npm/@solid/community-server/^7.0.0/components/context.jsonld",
+  "import": [
+    "css:config/app/init/initialize-intro.json",
+    "css:config/app/main/default.json",
+    "css:config/app/variables/default.json",
+    "css:config/http/handler/default.json",
+    "css:config/http/middleware/default.json",
+    "css:config/http/notifications/all.json",
+    "css:config/http/server-factory/http.json",
+    "css:config/http/static/default.json",
+    "css:config/identity/access/public.json",
+    "css:config/identity/email/default.json",
+    "css:config/identity/handler/default.json",
+    "css:config/identity/oidc/default.json",
+    "css:config/identity/ownership/token.json",
+    "css:config/identity/pod/static.json",
+    "css:config/ldp/authentication/dpop-bearer.json",
+    "css:config/ldp/authorization/webacl.json",
+    "css:config/ldp/handler/default.json",
+    "css:config/ldp/metadata-parser/default.json",
+    "css:config/ldp/metadata-writer/default.json",
+    "css:config/ldp/modes/default.json",
+    "css:config/storage/backend/file.json",
+    "css:config/storage/key-value/resource-store.json",
+    "css:config/storage/location/pod.json",
+    "css:config/storage/middleware/default.json",
+    "css:config/util/auxiliary/acl.json",
+    "css:config/util/identifiers/suffix.json",
+    "css:config/util/index/default.json",
+    "css:config/util/logging/winston.json",
+    "css:config/util/representation-conversion/default.json",
+    "css:config/util/resource-locker/file.json",
+    "css:config/util/variables/default.json"
+  ],
+  "@graph": [
+    {
+      "comment": [
+        "For an instance that already has pods as folders (example.org/alice/): pocpod0, and any server set up",
+        "before 7.2.0-1. Mount it over /config.json. Same as instance.json except: pods stay folders",
+        "(util/identifiers/suffix.json, never switched on an existing instance, see instance.json), and no",
+        "PodNameGuard, whose hostname rule would refuse names such instances already use (nicolas_claude).",
+        "The welcome page is the root container index.html here too: written once, on first start."
+      ]
+    },
+    {
+      "comment": [
+        "The public .md page (solid-kit's doc-view, overlay/doc-view/, generated): main.html.ejs loads these.",
+        "Matched on the path only, like every static asset, so they also answer on each pod's subdomain:",
+        "a pod resource named /doc-view.js or /doc-view.css would be hidden. The rest of the overlay is",
+        "under CSS's own /.well-known/css/ and needs no entry here."
+      ],
+      "@id": "urn:solid-server:default:StaticAssetHandler",
+      "@type": "StaticAssetHandler",
+      "assets": [
+        {
+          "@id": "urn:solid-server:overlay:DocViewScriptAsset",
+          "@type": "StaticAssetEntry",
+          "relativeUrl": "/doc-view.js",
+          "filePath": "@css:templates/doc-view/doc-view.js"
+        },
+        {
+          "@id": "urn:solid-server:overlay:DocViewStyleAsset",
+          "@type": "StaticAssetEntry",
+          "relativeUrl": "/doc-view.css",
+          "filePath": "@css:templates/doc-view/doc-view.css"
+        }
+      ]
+    }
+  ]
+}

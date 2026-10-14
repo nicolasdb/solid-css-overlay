@@ -1,0 +1,94 @@
+# =============================================================================
+# SERVICE: Community Solid Server ({{INSTANCE_NAME}})
+# DOMAIN:  {{DOMAIN}} and *.{{DOMAIN}}  (every pod is a subdomain)
+# BACKEND: container {{INSTANCE_NAME}}-css (gateway network, port 3000)
+# SSL:     one Let's Encrypt certificate for {{DOMAIN}} + *.{{DOMAIN}},
+#          issued by DNS-01 (README, "Wildcard certificate")
+#
+# TO INSTALL: copy into the gateway's nginx conf.d/ (on the nicolasdb VPS,
+# hetzner-gateway/nginx/conf.d/{{ORDER}}-{{INSTANCE_NAME}}.conf, deployed from
+# that repo), fill the placeholders, reload nginx.
+#
+# Placeholders: {{INSTANCE_NAME}} {{DOMAIN}} {{ORDER}}
+#
+# Any other service on this domain (mcp.{{DOMAIN}}, ...) gets its own server
+# block with an exact server_name, which nginx prefers over the wildcard: its
+# name must then be reserved in config/instance.json, or someone can create a
+# pod of that name that nobody can reach.
+# =============================================================================
+
+# Only with the UnsecureWebIdExtractor (see the proxy block): drops an
+# 'Authorization: WebID <uri>' header, passes DPoP and Bearer through.
+# map $http_authorization ${{INSTANCE_NAME}}_authorization {
+#     ~*^WebID  "";
+#     default   $http_authorization;
+# }
+
+server {
+    listen       80;
+    listen  [::]:80;
+    server_name  {{DOMAIN}} *.{{DOMAIN}};
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen       443 ssl;
+    listen  [::]:443 ssl;
+    server_name  {{DOMAIN}} *.{{DOMAIN}};
+
+    http2 on;
+
+    # Docker's embedded DNS, needed by the runtime upstream lookup below.
+    resolver 127.0.0.11 valid=30s ipv6=off;
+
+    # One certificate holding both names. A wildcard covers one level:
+    # openfab-bxl.{{DOMAIN}} yes, a.b.{{DOMAIN}} no (CSS never makes those).
+    ssl_certificate     /etc/letsencrypt/live/{{DOMAIN}}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/{{DOMAIN}}/privkey.pem;
+
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
+
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
+    access_log  /var/log/nginx/{{INSTANCE_NAME}}_https_access.log combined;
+    error_log   /var/log/nginx/{{INSTANCE_NAME}}_error.log;
+
+    # Files people put in their pods.
+    client_max_body_size 100m;
+
+    location / {
+        # Variable + resolver: resolved per request, so nginx still starts
+        # (and serves every other site) while this container is down.
+        set $upstream http://{{INSTANCE_NAME}}-css:3000;
+        proxy_pass $upstream;
+        proxy_http_version 1.1;
+
+        # CSS builds every URL from these: the Host decides WHICH POD a
+        # request is for. Never rewrite it (ADR 002 in solid-kit forbids URI
+        # rewriting at the proxy).
+        proxy_set_header Host              $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host  $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+
+        # Solid notifications (WebSocketChannel2023).
+        proxy_set_header Upgrade    $http_upgrade;
+        proxy_set_header Connection $http_connection;
+
+        # The image trusts no 'Authorization: WebID' header (its config has no
+        # UnsecureWebIdExtractor). An instance that adds one in its own config
+        # MUST strip the header here: uncomment, with the map at the top.
+        # proxy_set_header Authorization ${{INSTANCE_NAME}}_authorization;
+
+        proxy_redirect off;
+    }
+}

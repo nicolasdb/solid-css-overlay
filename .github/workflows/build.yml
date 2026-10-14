@@ -1,0 +1,90 @@
+# Every push: the guard's and the connector's tests, the image built, and the
+# smoke run against that image in both pod layouts. A tag v<stock>-<n>
+# (v7.2.0-1) also publishes both images to GHCR as <stock>-<n>, public.
+name: build
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: pod-name-guard tests
+        working-directory: pod-name-guard
+        run: npm ci && npm test
+
+      - name: mcp-connector tests
+        working-directory: mcp-connector
+        run: npm ci && npm test
+
+      - name: build the image
+        run: docker build -t solid-css-overlay:dev .
+
+      - name: stock templates unchanged since the overlay was reconciled
+        run: scripts/check-overrides.sh
+
+      - name: browser for the smoke run
+        working-directory: test
+        run: npm ci && npx playwright install --with-deps chromium
+
+      - name: smoke, subdomain pods (the image's default)
+        env: { POD_LAYOUT: subdomain }
+        run: |
+          test/try-local.sh 3123
+          node test/smoke.mjs http://localhost:3123 test/shots/subdomain
+          docker rm -f try-css-overlay-3123
+
+      - name: smoke, folder pods (config/suffix.json)
+        env: { POD_LAYOUT: suffix }
+        run: |
+          test/try-local.sh 3124
+          node test/smoke.mjs http://localhost:3124 test/shots/suffix
+
+      - name: screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-shots
+          path: test/shots/
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: the tag must match the Dockerfile's CSS_VERSION
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          stock="$(sed -n 's/^ARG CSS_VERSION=//p' Dockerfile)"
+          case "$tag" in "$stock"-[0-9]*) ;; *) echo "tag $tag does not start with $stock-"; exit 1 ;; esac
+          grep -q "^## $tag" CHANGELOG.md || { echo "CHANGELOG.md has no '## $tag'"; exit 1; }
+          echo "VERSION=$tag" >> "$GITHUB_ENV"
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: solid-css-overlay
+        run: |
+          docker build -t ghcr.io/nicolasdb/solid-css-overlay:$VERSION .
+          docker push ghcr.io/nicolasdb/solid-css-overlay:$VERSION
+      - name: solid-mcp-connector
+        run: |
+          docker build -t ghcr.io/nicolasdb/solid-mcp-connector:$VERSION mcp-connector
+          docker push ghcr.io/nicolasdb/solid-mcp-connector:$VERSION
