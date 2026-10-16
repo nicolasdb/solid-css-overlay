@@ -25,6 +25,15 @@ Getting the client id/secret (Community Solid Server):
 Then have the Pod owner (Nicolas, or a Singelijn student) grant that WebID
 scoped WAC access on the containers the agent should touch.
 
+## A collective's procedures and skill
+
+`procedures/` holds the instructions a collective's agent follows (pull,
+confrontation) and a member's agent follows (contribution), written against
+this connector's tools; `skills/collectif/` is the generic skill that loads
+them. Both moved here from solid-kit on 2026-10-16, so they ship with the
+connector they call. Deferred next step: [`docs/collective-pipeline.md`](docs/collective-pipeline.md)
+(pull as code, any file format, triggered by CSS webhooks).
+
 ## Use directly (Node)
 
 ```js

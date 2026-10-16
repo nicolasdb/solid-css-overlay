@@ -17,6 +17,11 @@ CSS is never patched. The image adds files where stock CSS looks for them
 second component is a decision to write down (an ADR in solid-kit), not a
 commit: every component is code to carry across every CSS release.
 
+A collective's procedures and the `collectif` skill live beside the
+connector (`mcp-connector/procedures/`, `mcp-connector/skills/collectif/`):
+a procedure and the tools it calls change together. The protocol they
+implement is solid-kit's ADR 006.
+
 The comments explaining *what went wrong before* are the most valuable content
 in these files. Keep them when changing the code around them.
 
