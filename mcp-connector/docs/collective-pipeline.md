@@ -41,17 +41,18 @@ That splits the collective's side in two:
 
 | Who | WebID | Holds | Does |
 |---|---|---|---|
-| the **puller** (code, in this connector) | `hs:agent`, the one members grant Read to | Read on members' shared folders; Read `inbox/`; Write `depots/` | follows announcements, snapshots, writes derived text |
-| the **confronter** (LLM: Hermes, or claude.ai by hand) | its own | Read `depots/`, `principles/`; Write `confrontations/`, `chantiers/` | confronts, writes report + sidecar, loads the graph |
+| the **puller** (code, in this connector) | `hs:agent`, the one members grant Read to | Read on members' shared folders; Read `inbox/`, `confrontations/`; Write `depots/` | follows announcements, snapshots, writes derived text, loads the graph |
+| the **confronter** (LLM: Hermes, or claude.ai by hand) | its own, declared `hs:confronter` | Read `depots/`, `principles/`; Write `confrontations/`, `chantiers/` | confronts, writes report + sidecar |
 
 - **Members grant one WebID, once.** Changing which LLM confronts, or
   running two, never asks members to grant again: the confronter's rights
   are on the collective's pod, given by its admin.
-- **Needs an amendment to solid-kit ADR 006**: §1 and §5 name a single
-  collective agent; §6 says only `hs:agent` loads the graph. Either the
-  confronter is declared in `config.ttl` (a new property beside `hs:agent`)
-  and `graph_ingest` accepts it, or ingest also runs as code on each new
-  sidecar. To settle before C.
+- **Settled in solid-kit ADR 006 §8** (2026-10-17): the confronter is
+  declared `hs:confronter` in `config.ttl`; the graph is loaded by code as
+  `hs:agent` after each confrontation; the sidecar's subject is the
+  original in its snapshot, its `dcterms:creator` the member. Other LLM
+  agents (a Discord bot) get rights on the collective's pod only, by
+  audience, and are never in members' rules.
 
 ## A. Pull as code
 
@@ -82,9 +83,9 @@ names both.
 | Source | Derived text |
 |---|---|
 | `.md`, `.txt` | as is, with each `data:` URI (base64 image) replaced by `[image: <alt>, <type>, <size>]` |
-| `.docx`, `.odt` | pandoc (or mammoth for `.docx`) |
+| `.docx`, `.odt` | pandoc |
 | `.pdf` | pdftotext; no text (a scan) is flagged, not guessed |
-| images | none at first: confronted from name, size and metadata, and flagged; later a vision model's description, marked as such |
+| images | none: the confronter is shown the image itself (MCP image content), up to a size cap, and the snapshot is marked |
 | anything else | none; snapshotted, marked `format-non-lu` |
 
 Confrontation reads the derived text only; the original stays untouched in
@@ -135,9 +136,6 @@ subscriptions that survive a restart (stored, re-created at boot).
 
 ## Elsewhere, when this starts
 
-- **solid-kit ADR 006**: §1/§5/§6 for the puller and the confronter; §3 for
-  derived-text naming and the hash; §4 for the webhook living in the
-  connector.
 - **solid-backoffice**: the summary before sharing (D).
 - **Each collective's pod copy** of the procedures (`hs:procedures`):
   updated by its admin when pull v3 ships.
