@@ -41,17 +41,18 @@ That splits the collective's side in two:
 
 | Who | WebID | Holds | Does |
 |---|---|---|---|
-| the **puller** (code, in this connector) | `hs:agent`, the one members grant Read to | Read on members' shared folders; Read `inbox/`; Write `depots/` | follows announcements, snapshots, writes derived text |
-| the **confronter** (LLM: Hermes, or claude.ai by hand) | its own | Read `depots/`, `principles/`; Write `confrontations/`, `chantiers/` | confronts, writes report + sidecar, loads the graph |
+| the **puller** (code, in this connector) | `hs:agent`, the one members grant Read to | Read on members' shared folders; Read `inbox/`, `confrontations/`; Write `depots/` | follows announcements, snapshots, writes derived text, loads the graph |
+| the **confronter** (LLM: Hermes, or claude.ai by hand) | its own, declared `hs:confronter` | Read `depots/`, `principles/`; Write `confrontations/`, `chantiers/` | confronts, writes report + sidecar |
 
 - **Members grant one WebID, once.** Changing which LLM confronts, or
   running two, never asks members to grant again: the confronter's rights
   are on the collective's pod, given by its admin.
-- **Needs an amendment to solid-kit ADR 006**: §1 and §5 name a single
-  collective agent; §6 says only `hs:agent` loads the graph. Either the
-  confronter is declared in `config.ttl` (a new property beside `hs:agent`)
-  and `graph_ingest` accepts it, or ingest also runs as code on each new
-  sidecar. To settle before C.
+- **Settled in solid-kit ADR 006 §8** (2026-10-17): the confronter is
+  declared `hs:confronter` in `config.ttl`; the graph is loaded by code as
+  `hs:agent` after each confrontation; the sidecar's subject is the
+  original in its snapshot, its `dcterms:creator` the member. Other LLM
+  agents (a Discord bot) get rights on the collective's pod only, by
+  audience, and are never in members' rules.
 
 ## A. Pull as code
 
@@ -82,14 +83,16 @@ names both.
 | Source | Derived text |
 |---|---|
 | `.md`, `.txt` | as is, with each `data:` URI (base64 image) replaced by `[image: <alt>, <type>, <size>]` |
-| `.docx`, `.odt` | pandoc (or mammoth for `.docx`) |
+| `.docx`, `.odt` | pandoc |
 | `.pdf` | pdftotext; no text (a scan) is flagged, not guessed |
-| images | none at first: confronted from name, size and metadata, and flagged; later a vision model's description, marked as such |
+| images | none: the confronter is shown the image itself (MCP image content), up to a size cap, and the snapshot is marked |
 | anything else | none; snapshotted, marked `format-non-lu` |
 
 Confrontation reads the derived text only; the original stays untouched in
-its snapshot. A size cap on derived text sent to the confronter (truncate
-and say so).
+its snapshot. Each extraction records its outcome in `status.ttl`:
+`texte-complet`, `texte-partiel` (what is missing) or `texte-echec`
+(ADR 006 §8). A text too long for the confronter is read in parts, never
+truncated.
 
 ## D. Ready for a backlog
 
@@ -100,8 +103,8 @@ and say so).
   backoffice's Share panel, the number of files, their types and total size
   in the folder picked (solid-backoffice; a share publishes everything
   inside, which makes the consent heavier with a backlog).
-- **Limits**: a maximum size per file; an unread format is snapshotted and
-  marked, never refused silently.
+- **No size cap on the pull**: code streams the bytes. An unread format is
+  snapshotted and marked, never refused silently.
 
 ## C. The trigger: webhooks from CSS, polling behind
 
@@ -124,9 +127,11 @@ itself:
    source, for servers without notifications and for anything missed while
    the connector was down; and re-subscription before CSS drops channels
    (14 days by default).
-4. **Then the confronter.** After a pull that created snapshots, the
-   confronter runs: a Hermes cron that confronts when something is pending
-   (cheap to check), or a call from the connector to Hermes. Batches as in D.
+4. **Then the confronter.** At the end of a pull that created snapshots
+   (after their derived text and status), the connector calls the
+   confronter with the list. Never earlier. It confronts
+   `texte-complet`, `texte-partiel` (saying so) and images; `texte-echec`
+   waits in the pull report for the admin. Batches as in D.
 
 What it needs: a webhook route on the connector reachable by every server a
 member's pod lives on (public, through the gateway; the CSS signature
@@ -135,9 +140,6 @@ subscriptions that survive a restart (stored, re-created at boot).
 
 ## Elsewhere, when this starts
 
-- **solid-kit ADR 006**: §1/§5/§6 for the puller and the confronter; §3 for
-  derived-text naming and the hash; §4 for the webhook living in the
-  connector.
 - **solid-backoffice**: the summary before sharing (D).
 - **Each collective's pod copy** of the procedures (`hs:procedures`):
   updated by its admin when pull v3 ships.
