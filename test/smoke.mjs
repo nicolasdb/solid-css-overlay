@@ -102,16 +102,26 @@ check(root.status === 200 && /turtle/.test(root.type) && /pim\/space#Storage>; r
 await page.waitForFunction(() => document.querySelectorAll("#podEntries li").length >= 2);
 await shot(page, "03-account");
 
-// Theme: chosen, stamped, kept across a reload
-await page.click("[data-theme-set=dark]");
+// Theme (solid-kit ADR 008): Light, Dark, Same as this device; kept across a reload
+const theme = () => page.evaluate(() => document.documentElement.dataset.theme);
+check((await theme()) === "light", "theme: Light by default, stamped");
+await page.click("[data-theme-button]");
 await page.reload();
 await page.waitForLoadState("domcontentloaded");
-check((await page.evaluate(() => document.documentElement.dataset.theme)) === "dark", "theme: Dark survives a reload");
-check((await page.getAttribute("[data-theme-set=dark]", "aria-pressed")) === "true", "theme: the switch shows Dark pressed");
+check((await theme()) === "dark", "theme: Dark survives a reload");
+check((await page.getAttribute("[data-theme-button]", "aria-label")) === "Theme: dark. Change it", "theme: the button names Dark");
 await shot(page, "04-account-dark");
-await page.click("[data-theme-set=contrast]");
+// Same as this device, on a system asking for more contrast: High contrast.
+await page.emulateMedia({ contrast: "more" });
+await page.click("[data-theme-button]");
+check((await theme()) === "contrast", "theme: same as this device gives High contrast when the system asks for it");
 await shot(page, "05-account-contrast");
-await page.click("[data-theme-set=light]");
+await page.emulateMedia({ contrast: "no-preference", colorScheme: "dark" });
+check((await theme()) === "dark", "theme: same as this device follows the system while the page is open");
+await page.emulateMedia({ colorScheme: "light" });
+await page.click("[data-theme-button]");
+check((await theme()) === "light" && (await page.evaluate(() => localStorage.getItem("solid-kit:theme"))) === null,
+  "theme: back to Light, the stored choice cleared");
 
 // Consent through a real OIDC flow
 const reg = await (await fetch(`${base}/.oidc/reg`, {

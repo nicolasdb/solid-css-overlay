@@ -95,24 +95,29 @@ body > footer {
 }
 body > footer p { margin: 0; }
 
-/* Theme switch: same contract as solid-kit src/ui/theme.ts. The chosen theme
-   shows by fill AND weight, never by colour alone. */
-.theme-switch { display: flex; flex-wrap: wrap; gap: 4px; }
-.theme-switch button,
-.theme-switch button:hover {
+/* Theme button: same contract as solid-kit src/ui/theme.ts (ADR 008). One
+   icon, its label in aria-label and title; a 44px target, like every control
+   here. */
+.theme-button,
+.theme-button:hover {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
   min-height: 44px;
-  padding: 8px 12px;
-  font-size: 0.875rem;
-  font-weight: 400;
+  padding: 0;
   color: var(--text-secondary);
   background: transparent;
-  border-color: transparent;
+  border-color: var(--border-control);
 }
-.theme-switch button[aria-pressed="true"] {
-  color: var(--text-primary);
-  font-weight: 600;
-  background: var(--accent-soft);
-  border-color: var(--accent-line);
+.theme-button:hover { color: var(--text-primary); }
+.theme-icon {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
 }
 
 /* ---- Type ---- */

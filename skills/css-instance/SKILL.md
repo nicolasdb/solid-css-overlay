@@ -24,10 +24,12 @@ Instance 1 is pod.nicolasdb.eu (pocpod0, folder pods, `config/suffix.json`).
 2. **What comes from outside goes in as text.** An app's name, a client ID, a
    server error, a WebID: `textContent`, never `innerHTML` or a template
    string into markup. Stock CSS gets this wrong on consent; ours does not.
-3. **Light is the default.** Dark and High contrast only behind
-   `<html data-theme>`, stamped before first paint by `pod-ui.js`; no
-   `prefers-color-scheme: dark`; `prefers-contrast: more` only while no
-   choice is stored (solid-kit ADR 008). Same storage key as the kit.
+3. **Light is the default**, stamped `data-theme="light"` in the pages. Dark
+   and High contrast only behind `<html data-theme>`, applied before first
+   paint by `pod-ui.js`: the theme button cycles Light, Dark, Same as this
+   device, and "same as this device" resolves there (High contrast first,
+   then dark). No media block in the skin at all (solid-kit ADR 008,
+   amended). Same storage key as the kit.
 4. **The complete slot set in every theme**, text at 4.5:1 (7:1 in High
    contrast), `--border-control` at 3:1. The audit decides, not the eye.
 5. **No third-party request.** Fonts are self-hosted woff2 in the skin.
@@ -87,7 +89,7 @@ until it passes. A brand colour that fails as text (a riso red on paper) stays
 for marks, borders and 24 px+ type; give text a darker sibling slot.
 
 A paper-only skin has no dark look: keep the dark block with the Daylight
-values, or remove the "Dark" button (`INSTANCE: theme switch`).
+values, or remove the theme button (`INSTANCE: theme button`).
 
 ### 4. The words
 
