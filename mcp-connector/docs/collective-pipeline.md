@@ -89,8 +89,10 @@ names both.
 | anything else | none; snapshotted, marked `format-non-lu` |
 
 Confrontation reads the derived text only; the original stays untouched in
-its snapshot. A size cap on derived text sent to the confronter (truncate
-and say so).
+its snapshot. Each extraction records its outcome in `status.ttl`:
+`texte-complet`, `texte-partiel` (what is missing) or `texte-echec`
+(ADR 006 §8). A text too long for the confronter is read in parts, never
+truncated.
 
 ## D. Ready for a backlog
 
@@ -101,8 +103,8 @@ and say so).
   backoffice's Share panel, the number of files, their types and total size
   in the folder picked (solid-backoffice; a share publishes everything
   inside, which makes the consent heavier with a backlog).
-- **Limits**: a maximum size per file; an unread format is snapshotted and
-  marked, never refused silently.
+- **No size cap on the pull**: code streams the bytes. An unread format is
+  snapshotted and marked, never refused silently.
 
 ## C. The trigger: webhooks from CSS, polling behind
 
@@ -125,9 +127,11 @@ itself:
    source, for servers without notifications and for anything missed while
    the connector was down; and re-subscription before CSS drops channels
    (14 days by default).
-4. **Then the confronter.** After a pull that created snapshots, the
-   confronter runs: a Hermes cron that confronts when something is pending
-   (cheap to check), or a call from the connector to Hermes. Batches as in D.
+4. **Then the confronter.** At the end of a pull that created snapshots
+   (after their derived text and status), the connector calls the
+   confronter with the list. Never earlier. It confronts
+   `texte-complet`, `texte-partiel` (saying so) and images; `texte-echec`
+   waits in the pull report for the admin. Batches as in D.
 
 What it needs: a webhook route on the connector reachable by every server a
 member's pod lives on (public, through the gateway; the CSS signature
