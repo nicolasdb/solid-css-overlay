@@ -5,9 +5,10 @@
  * file (and fonts/, and the copy) and never main.css.
  *
  * This is the reference skin, "pod": Solid Kit's values (Daylight, Ink, High
- * contrast) with Lexend, Atkinson Hyperlegible and JetBrains Mono. Copy it to
- * start another, then `npm run audit -- --skin <this file>` in solid-kit until
- * it passes: every text slot 4.5:1 (7:1 in High contrast), --border-control
+ * contrast) with Lexend, Atkinson Hyperlegible and JetBrains Mono, and the
+ * kit's display serif, Newsreader, for page titles (the editorial register).
+ * Copy it to start another, then `npm run audit -- --skin <this file>` in
+ * solid-kit until it passes: every text slot 4.5:1 (7:1 in High contrast), --border-control
  * 3:1, the complete slot set in every theme.
  *
  * Served at /.well-known/css/styles/skin.css (a bind mount over CSS's stock
@@ -29,10 +30,15 @@
 @font-face { font-family: "Lexend"; font-style: normal; font-weight: 600; font-display: swap; src: url("../fonts/skin/lexend-latin-600-normal.woff2") format("woff2"); }
 @font-face { font-family: "Atkinson Hyperlegible"; font-style: normal; font-weight: 400; font-display: swap; src: url("../fonts/skin/atkinson-hyperlegible-latin-400-normal.woff2") format("woff2"); }
 @font-face { font-family: "Atkinson Hyperlegible"; font-style: normal; font-weight: 700; font-display: swap; src: url("../fonts/skin/atkinson-hyperlegible-latin-700-normal.woff2") format("woff2"); }
+/* The display serif: 400 roman and italic only, never bold (Solid Kit). */
+@font-face { font-family: "Newsreader"; font-style: normal; font-weight: 400; font-display: swap; src: url("../fonts/skin/newsreader-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "Newsreader"; font-style: italic; font-weight: 400; font-display: swap; src: url("../fonts/skin/newsreader-latin-400-italic.woff2") format("woff2"); }
 @font-face { font-family: "JetBrains Mono"; font-style: normal; font-weight: 400; font-display: swap; src: url("../fonts/skin/jetbrains-mono-latin-400-normal.woff2") format("woff2"); }
 @font-face { font-family: "JetBrains Mono"; font-style: normal; font-weight: 500; font-display: swap; src: url("../fonts/skin/jetbrains-mono-latin-500-normal.woff2") format("woff2"); }
 
 :root {
+  /* Titles and the pull line only, never running text (main.css .display). */
+  --font-display: "Newsreader", Georgia, serif;
   --font-heading: "Lexend", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-body: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
