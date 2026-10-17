@@ -116,8 +116,11 @@ await page.emulateMedia({ contrast: "more" });
 await page.click("[data-theme-button]");
 check((await theme()) === "contrast", "theme: same as this device gives High contrast when the system asks for it");
 await shot(page, "05-account-contrast");
+// The media query's change event arrives after emulateMedia returns: wait for it.
 await page.emulateMedia({ contrast: "no-preference", colorScheme: "dark" });
-check((await theme()) === "dark", "theme: same as this device follows the system while the page is open");
+const followed = await page.waitForFunction(() => document.documentElement.dataset.theme === "dark", null, { timeout: 3000 })
+  .then(() => true, () => false);
+check(followed, "theme: same as this device follows the system while the page is open");
 await page.emulateMedia({ colorScheme: "light" });
 await page.click("[data-theme-button]");
 check((await theme()) === "light" && (await page.evaluate(() => localStorage.getItem("solid-kit:theme"))) === null,
