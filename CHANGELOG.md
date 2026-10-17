@@ -19,6 +19,17 @@ First release: the overlay moves here from solid-kit `templates/css-instance/`
   every subdomain pod's root with it.
 - **Pages**: the create-pod address preview and the consent page's WebID
   display follow the pod layout (`overlay/pod-layout.js`).
+- **The editorial register** (Solid Kit design system, solid-kit `design/`):
+  page titles in the display serif, Newsreader 400 (`--font-display`, a new
+  skin slot; a skin without it keeps its heading face), the eyebrow on the
+  welcome page, `.hint` for help text (stock's `.checkbox-explanation` too).
+  The welcome page's three ideas are topped by a hairline and numbered, as
+  the kit's `.how-steps`, instead of ruled on the left.
+- **The theme button** (solid-kit ADR 008, amended): one icon button cycling
+  Light, Dark, Same as this device, in place of the three-word switch. Light
+  is stamped in the HTML and clears the stored choice; `pod-ui.js` resolves
+  "same as this device" (High contrast first, then dark) and follows it. The
+  skin's `prefers-contrast` copy of High contrast is gone. Assets at `?v=2`.
 - **mcp-connector**: the pod a URL belongs to is discovered (`src/podRoot.js`,
   solid-kit's rule), no longer read off the URL path; public address from
   `MCP_PUBLIC_BASE`.

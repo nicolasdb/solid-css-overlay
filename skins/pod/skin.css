@@ -5,22 +5,25 @@
  * file (and fonts/, and the copy) and never main.css.
  *
  * This is the reference skin, "pod": Solid Kit's values (Daylight, Ink, High
- * contrast) with Lexend, Atkinson Hyperlegible and JetBrains Mono. Copy it to
- * start another, then `npm run audit -- --skin <this file>` in solid-kit until
- * it passes: every text slot 4.5:1 (7:1 in High contrast), --border-control
+ * contrast) with Lexend, Atkinson Hyperlegible and JetBrains Mono, and the
+ * kit's display serif, Newsreader, for page titles (the editorial register).
+ * Copy it to start another, then `npm run audit -- --skin <this file>` in
+ * solid-kit until it passes: every text slot 4.5:1 (7:1 in High contrast), --border-control
  * 3:1, the complete slot set in every theme.
  *
  * Served at /.well-known/css/styles/skin.css (a bind mount over CSS's stock
  * styles folder), linked before main.css by main.html.ejs and the welcome page.
  *
- * Themes (solid-kit ADR 008): Daylight is the default for everyone and lives on
- * bare :root. Ink and High contrast exist only behind <html data-theme>,
- * stamped before first paint by pod-ui.js from the stored choice. Never add a
- * prefers-color-scheme: dark block. The one OS signal followed is
- * prefers-contrast: more, and only while no choice is stored. An instance
- * without a dark look (a paper-only skin) still defines the dark block: give it
- * the same values as Daylight, so the switch's "Dark" stays honest, or remove
- * the button in main.html.ejs (INSTANCE: theme switch).
+ * Themes (solid-kit ADR 008, amended): Daylight is the default for everyone
+ * and lives on bare :root; the pages stamp data-theme="light". Ink and High
+ * contrast exist only behind <html data-theme>, applied before first paint by
+ * pod-ui.js: the theme button cycles Light, Dark, Same as this device, and
+ * "same as this device" is resolved there (contrast first, then dark). So
+ * there is no media block here at all: never add a prefers-color-scheme block,
+ * nor a prefers-contrast copy of High contrast. An instance without a dark
+ * look (a paper-only skin) still defines the dark block: give it the same
+ * values as Daylight, so "Dark" stays honest, or remove the button in
+ * main.html.ejs (INSTANCE: theme button).
  */
 
 /* ---- Fonts: self-hosted, Latin subset (fonts/README.md beside this file) ---- */
@@ -29,10 +32,15 @@
 @font-face { font-family: "Lexend"; font-style: normal; font-weight: 600; font-display: swap; src: url("../fonts/skin/lexend-latin-600-normal.woff2") format("woff2"); }
 @font-face { font-family: "Atkinson Hyperlegible"; font-style: normal; font-weight: 400; font-display: swap; src: url("../fonts/skin/atkinson-hyperlegible-latin-400-normal.woff2") format("woff2"); }
 @font-face { font-family: "Atkinson Hyperlegible"; font-style: normal; font-weight: 700; font-display: swap; src: url("../fonts/skin/atkinson-hyperlegible-latin-700-normal.woff2") format("woff2"); }
+/* The display serif: 400 roman and italic only, never bold (Solid Kit). */
+@font-face { font-family: "Newsreader"; font-style: normal; font-weight: 400; font-display: swap; src: url("../fonts/skin/newsreader-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "Newsreader"; font-style: italic; font-weight: 400; font-display: swap; src: url("../fonts/skin/newsreader-latin-400-italic.woff2") format("woff2"); }
 @font-face { font-family: "JetBrains Mono"; font-style: normal; font-weight: 400; font-display: swap; src: url("../fonts/skin/jetbrains-mono-latin-400-normal.woff2") format("woff2"); }
 @font-face { font-family: "JetBrains Mono"; font-style: normal; font-weight: 500; font-display: swap; src: url("../fonts/skin/jetbrains-mono-latin-500-normal.woff2") format("woff2"); }
 
 :root {
+  /* Titles and the pull line only, never running text (main.css .display). */
+  --font-display: "Newsreader", Georgia, serif;
   --font-heading: "Lexend", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-body: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
@@ -115,30 +123,4 @@
   --danger-soft: #f9ecea;
   --code-bg: #efece3;
   color-scheme: light;
-}
-
-/* The OS asked for more contrast and no choice is stored: same values. */
-@media (prefers-contrast: more) {
-  :root:not([data-theme]) {
-    --surface: #fbfaf7;
-    --surface-elevated: #ffffff;
-    --surface-recessed: #efece3;
-    --text-primary: #1a1814;
-    --text-secondary: #3a362d;
-    --text-tertiary: #433e33;
-    --border: #7a7466;
-    --border-subtle: #8a8475;
-    --border-control: #7a7466;
-    --selection: #c9dccf;
-    --accent: #28493a;
-    --accent-contrast: #ffffff;
-    --accent-soft: #e3ece6;
-    --accent-line: #4f7a62;
-    --warn: #6e4210;
-    --warn-soft: #faf3e6;
-    --warn-line: #a8691f;
-    --danger: #7a2018;
-    --danger-soft: #f9ecea;
-    --code-bg: #efece3;
-  }
 }
