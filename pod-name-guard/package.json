@@ -1,0 +1,31 @@
+{
+  "name": "@solid-css-overlay/pod-name-guard",
+  "version": "1.0.0",
+  "description": "Refuses pod names that would not make a valid subdomain, and reserved ones, before CSS creates the pod.",
+  "license": "MIT",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "lsd:module": "https://linkedsoftwaredependencies.org/bundles/npm/@solid-css-overlay/pod-name-guard",
+  "lsd:components": "dist/components/components.jsonld",
+  "lsd:contexts": {
+    "https://linkedsoftwaredependencies.org/bundles/npm/@solid-css-overlay/pod-name-guard/^1.0.0/components/context.jsonld": "dist/components/context.jsonld"
+  },
+  "lsd:importPaths": {
+    "https://linkedsoftwaredependencies.org/bundles/npm/@solid-css-overlay/pod-name-guard/^1.0.0/components/": "dist/components/",
+    "https://linkedsoftwaredependencies.org/bundles/npm/@solid-css-overlay/pod-name-guard/^1.0.0/dist/": "dist/"
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc && componentsjs-generator -s src -c dist/components -r guard",
+    "test": "npm run build && node --test test/*.test.js"
+  },
+  "peerDependencies": {
+    "@solid/community-server": "^7.0.0"
+  },
+  "devDependencies": {
+    "@solid/community-server": "7.2.0",
+    "componentsjs-generator": "^3.1.2",
+    "typescript": "^5.5.3"
+  }
+}

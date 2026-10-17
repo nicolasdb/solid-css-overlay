@@ -1,0 +1,76 @@
+# A Community Solid Server instance from the solid-css-overlay image.
+# Copy this folder, fill .env (from .env.example), then:
+#   docker compose pull && docker compose up -d
+# No build: both images are published (ghcr.io/nicolasdb/...). An update is a
+# new CSS_OVERLAY_VERSION in .env, then the same two commands.
+services:
+  css:
+    image: ghcr.io/nicolasdb/solid-css-overlay:${CSS_OVERLAY_VERSION:?set CSS_OVERLAY_VERSION in .env}
+    container_name: ${INSTANCE_NAME:?set INSTANCE_NAME in .env}-css
+    restart: unless-stopped
+    environment:
+      # The server's address, trailing slash included. Pods are subdomains of
+      # its host: https://pod.example.org/ gives https://<name>.pod.example.org/.
+      # It is every WebID's and every link's prefix: choose it once.
+      - CSS_BASE_URL=${CSS_BASE_URL:?set CSS_BASE_URL in .env}
+      # Uncomment for an instance that already has pods as folders (README).
+      # - CSS_CONFIG=/config/suffix.json
+    volumes:
+      - css-data:/data
+      # The instance's own look and words, mounted over the image's (overlay/README.md).
+      # Uncomment what exists in ./overlay.
+      # - ./overlay/skin.css:/community-server/templates/styles/skin.css:ro
+      # - ./overlay/fonts:/community-server/templates/fonts/skin:ro
+      # - ./overlay/welcome/index.html:/community-server/templates/root/intro/base/index.html:ro
+      # More reserved pod names than the image's list: a copy of config/instance.json.
+      # - ./overlay/instance.json:/config/instance.json:ro
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('net').createConnection(3000,'localhost').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 40s
+    # No `ports:`: the gateway (gateway-vhost.conf.tmpl) reaches the server by
+    # container name over the gateway network. A published port would be a
+    # second way in that skips the gateway's TLS and header stripping.
+    networks: [default, gateway]
+
+  # The MCP connector: agents read and write pods through it. Optional; delete
+  # this service if the instance has no agents.
+  mcp-connector:
+    image: ghcr.io/nicolasdb/solid-mcp-connector:${CSS_OVERLAY_VERSION}
+    container_name: ${INSTANCE_NAME}-mcp-connector
+    restart: unless-stopped
+    environment:
+      - PORT=3939
+      - HOST=0.0.0.0
+      - SOLID_OIDC_ISSUER=${CSS_BASE_URL}
+      # Its public address (upload links, onboarding). Required: unset, the
+      # connector would fall back to pod.nicolasdb.eu's.
+      - MCP_PUBLIC_BASE=${MCP_PUBLIC_BASE:?set MCP_PUBLIC_BASE in .env, or delete this service}
+      # Every Host the connector answers on (the SDK's DNS-rebinding check):
+      # its own vhost, and the server's if /onboard/ is proxied there.
+      # Required: empty turns the check off.
+      - ALLOWED_HOSTS=${MCP_ALLOWED_HOSTS:?set MCP_ALLOWED_HOSTS in .env, or delete this service}
+      - ONBOARD_CORS_ORIGINS=${ONBOARD_CORS_ORIGINS:-}
+      # Empty: graph_query and graph_ingest answer "unavailable", the rest works.
+      - OXIGRAPH_URL=${OXIGRAPH_URL:-}
+    volumes:
+      # Secrets stay on the VPS, never in an image. identities.json is
+      # written by /onboard/ (mint, revoke): read-write. Create both before
+      # the first `up` (an absent file becomes a directory).
+      - ./mcp-connector/identities.json:/app/identities.json
+      - ./mcp-connector/.env:/app/.env:ro
+      - mcp-audit:/app/audit
+    mem_limit: 256m
+    networks: [default, gateway]
+
+networks:
+  default: {}
+  gateway:
+    external: true
+    name: ${GATEWAY_NETWORK:-gateway}
+
+volumes:
+  css-data: {}
+  mcp-audit: {}

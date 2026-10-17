@@ -1,0 +1,35 @@
+# Weekly: has the Community Solid Server released past the version the image
+# is built from? If so, open (once) an issue with the steps. Nothing is bumped
+# automatically: a new stock release can move a template the overlay
+# replaces, and only scripts/check-overrides.sh + a smoke run can tell.
+name: stock-watch
+
+on:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ours="$(sed -n 's/^ARG CSS_VERSION=//p' Dockerfile)"
+          latest="$(gh api repos/CommunitySolidServer/CommunitySolidServer/releases/latest --jq .tag_name)"
+          latest="${latest#v}"
+          echo "built from $ours, latest stock $latest"
+          [ "$latest" = "$ours" ] && exit 0
+          title="Stock CSS $latest is out (image built from $ours)"
+          if gh issue list --state open --search "\"$title\" in:title" --json number --jq length | grep -qv '^0$'; then exit 0; fi
+          gh issue create --title "$title" --body "$(printf '%s\n' \
+            "1. \`docker pull solidproject/community-server:$latest\`" \
+            "2. \`scripts/check-overrides.sh solidproject/community-server:$latest\`: merge every template it flags into overlay/, then \`--rebaseline\`." \
+            "3. \`ARG CSS_VERSION=$latest\` in the Dockerfile, \`@solid/community-server\` in pod-name-guard/package.json; rebuild, smoke both layouts." \
+            "4. CHANGELOG \`## $latest-1\`, tag \`v$latest-1\`.")"

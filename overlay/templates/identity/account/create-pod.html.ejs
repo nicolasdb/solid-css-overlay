@@ -1,0 +1,175 @@
+<%# Override of CSS 7.2.0 identity/account/create-pod.html.ejs (upstream-baseline.sha256).
+    Kept from stock: every id and name, and the request in addPostListener.
+    Changed: copy; the address the name will give, under the field (an <output>,
+    not a field); the external-WebID field shows only when that option is chosen;
+    labels wrap their text in a <span> so it sits beside the radio, not under it.
+    Also fixes stock's getElements('linkStorageCheckbox'), an id that does not exist.
+    The preview follows window.podLayout (scripts/pod-layout.js): with subdomain pods
+    the name becomes a hostname, so a name that cannot be one is refused before the
+    request, with the words the server's PodNameGuard would answer. The server
+    check is the real one (the account API can be called without this form). -%>
+<h1>Create your pod</h1>
+<form method="post" id="mainForm">
+  <p class="error" id="error"></p>
+
+  <fieldset>
+    <p>Name your pod, your own storage space on this server. The name becomes part of its address, in lower case: letters a to z, digits and hyphens.</p>
+    <ol>
+      <li>
+        <label for="name">Name</label>
+        <input id="name" type="text" name="name" autofocus aria-describedby="podUrlPreview">
+        <output id="podUrlPreview" class="preview" for="name"></output>
+      </li>
+    </ol>
+    <p>Which WebID — your name on the web — may write to this pod?</p>
+    <ol>
+      <li class="radio">
+        <label>
+          <input type="radio" id="internalWebIdOn" name="internalWebId" value="on" checked>
+          <span>A new WebID inside this pod, registered to your account.</span>
+        </label>
+        <ol id="linkStorageForm">
+          <li class="checkbox">
+            <label>
+              <input type="checkbox" id="linkStorage" name="linkStorage" checked>
+              <span>Link this pod from my WebID.
+                <span class="checkbox-explanation" style="display: block">This adds a <code>pim:storage</code> line to your WebID,
+                  saying the pod is yours. Without it, apps have to ask you where your data is.</span></span>
+            </label>
+          </li>
+        </ol>
+      </li>
+      <li class="radio">
+        <label>
+          <input type="radio" id="internalWebIdOff" name="internalWebId" value="">
+          <span>A WebID I already have elsewhere.</span>
+        </label>
+        <ol id="existingWebIdForm">
+          <li>
+            <label for="webId">Existing WebID</label>
+            <input id="webId" type="text" name="webId">
+          </li>
+        </ol>
+      </li>
+    </ol>
+  </fieldset>
+
+  <ul class="actions">
+    <li><button type="submit" name="submit" disabled>Create pod</button></li>
+    <li><button type="button" id="account-link">Back</button></li>
+  </ul>
+</form>
+<div class="hidden" id="response">
+  <h2>Your new pod</h2>
+  <p>
+    Your new pod is located at <a id="response-podBaseUrl" href="" class="link"></a>.
+    <br>
+    You can store your documents and data there.
+    All WebIDs registered to this account have control access to this pod.
+  </p>
+
+  <div id="response-linkWebId">
+    <h2>Your new WebID</h2>
+    <p>
+      Your new WebID is <a id="response-webId" href="" class="link"></a> — your name on the web.
+      <br>
+      You can use this identifier to interact with Solid pods and apps.
+    </p>
+  </div>
+
+  <p class="actions"><button type="button" id="response-account-link">Back</button></p>
+</div>
+
+
+<script>
+  const { mainForm, internalWebIdOn, linkStorage } = getElements('mainForm', 'internalWebIdOn', 'linkStorage');
+
+  (async() => {
+    let res = await fetch('<%= idpIndex %>', { headers: { accept: 'application/json' } });
+
+    const { controls } = await res.json();
+    setRedirectClick('account-link', controls.html.account.account);
+    setRedirectClick('response-account-link', controls.html.account.account);
+
+    // Toggle visibility of the "link storage" checkbox based on which WebID option is chosen
+    function updateLinkStorageVisibility() {
+      setVisibility('linkStorageForm', internalWebIdOn.checked);
+      setVisibility('existingWebIdForm', !internalWebIdOn.checked);
+      if (!internalWebIdOn.checked) {
+        linkStorage.checked = false;
+      }
+    }
+    mainForm.addEventListener('change', (event) => {
+      if (event.target.name === 'internalWebId') {
+        updateLinkStorageVisibility();
+      }
+    });
+    setVisibility('existingWebIdForm', !internalWebIdOn.checked);
+
+    // The pod's address as the name is typed, cleaned the way CSS cleans it
+    // (anything but a-z, 0-9 and _ becomes "-", then lower case) so the preview
+    // shows the address the server will really make. The server is the base URL,
+    // the account index's parent; a pod is either a subdomain of it or a folder.
+    const server = new URL('..', '<%= idpIndex %>');
+    const subdomains = window.podLayout !== 'suffix';
+    const nameInput = document.getElementById('name');
+    const preview = document.getElementById('podUrlPreview');
+    const clean = (name) => name.trim().replace(/\W/gu, '-').toLowerCase();
+    function updatePreview() {
+      const name = Object.assign(document.createElement('b'), { textContent: clean(nameInput.value) || 'your-pod-name' });
+      if (subdomains) {
+        preview.replaceChildren(`${server.protocol}//`, name, `.${server.host}${server.pathname}`);
+      } else {
+        preview.replaceChildren(server.href, name, '/');
+      }
+    }
+    nameInput.addEventListener('input', updatePreview);
+    updatePreview();
+
+    // The same rule as pod-name-guard/src/PodNameGuard.ts, in the same words:
+    // one DNS label. Reserved names are the server's to refuse; it knows the list.
+    function nameProblem(name) {
+      const label = clean(name);
+      if (label.length > 63) {
+        return `A pod name can be 63 characters at most (this one has ${label.length}): it becomes the pod's address.`;
+      }
+      if (!/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/u.test(label)) {
+        return `"${name}" cannot be a pod name: it becomes the pod's address, which can only hold ` +
+          'the letters a to z, digits and hyphens, and cannot start or end with a hyphen.';
+      }
+    }
+
+    addPostListener(async() => {
+      const formData = new FormData(mainForm);
+      // Refuse, never correct: the address is the person's choice to make.
+      const problem = subdomains && nameProblem(formData.get('name') || '');
+      if (problem) {
+        throw new Error(problem);
+      }
+      const json = {
+        name: formData.get('name'),
+      }
+      if (formData.get('internalWebId') === '') {
+        json.settings = { webId: formData.get('webId') };
+      } else if (formData.get('linkStorage') === 'on') {
+        json.settings = { linkStorage: true };
+      }
+
+      const res = await postJson(controls.account.pod, json);
+      if (res.status >= 400) {
+        throw new Error((await res.json()).message);
+      }
+
+      const { pod, webId, webIdResource } = await res.json();
+
+      updateElement('response-podBaseUrl', pod, { innerText: true, href: true });
+      if (webIdResource) {
+        updateElement('response-webId', webId, { innerText: true, href: true });
+      }
+
+      setVisibility('response', true);
+      setVisibility('response-linkWebId', Boolean(webIdResource));
+      setVisibility('mainForm', false);
+    });
+  })();
+</script>
