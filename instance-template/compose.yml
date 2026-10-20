@@ -30,7 +30,7 @@ services:
       timeout: 10s
       retries: 10
       start_period: 40s
-    # No `ports:`: the gateway (gateway-vhost.conf.tmpl) reaches the server by
+    # No `ports:`: the gateway (Caddyfile.tmpl or gateway-vhost.conf.tmpl) reaches the server by
     # container name over the gateway network. A published port would be a
     # second way in that skips the gateway's TLS and header stripping.
     networks: [default, gateway]

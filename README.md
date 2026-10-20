@@ -36,50 +36,94 @@ ACL and link would point at something else.
 
 ## Install from scratch
 
-On a VPS with Docker and an nginx gateway on an external Docker network.
+On a VPS with Docker and a gateway container (Caddy or nginx) on a Docker
+network the instance joins. `docs/handoff-mapsofmaking.md` is this section
+applied to one VPS, step by step.
 
 1. **Choose the server's address**, once: it is in every WebID. It needs a host
    of its own, since pods are its subdomains: `https://pod.mapsofmaking.org/`
    gives `https://openfab-bxl.pod.mapsofmaking.org/`. (The bare domain works
    too, if nothing else lives on it.)
-2. **DNS**: `pod` and `*.pod` (A/AAAA) to the VPS.
-3. **Wildcard certificate**, below.
-4. **The instance**:
+2. **DNS**: `pod` and `*.pod` (A, and AAAA if the VPS has IPv6) to the VPS.
+   Check: `dig +short A anything.pod.<domain>` answers the VPS's address.
+3. **An API token for the DNS host**, for the wildcard certificate (below).
+4. **The instance**, CSS first:
    ```sh
-   cp -r instance-template/ ~/mapsofmaking && cd ~/mapsofmaking
-   cp .env.example .env                       # INSTANCE_NAME, CSS_BASE_URL, CSS_OVERLAY_VERSION
+   cp -r instance-template/ /srv/mapsofmaking && cd /srv/mapsofmaking
+   cp .env.example .env                       # every value; the comments say what
    mkdir -p mcp-connector && echo '{}' > mcp-connector/identities.json && touch mcp-connector/.env
-   docker compose pull && docker compose up -d
+   chown 1000:1000 mcp-connector/identities.json mcp-connector/.env   # the connector runs as uid 1000
+   chmod 600 mcp-connector/identities.json mcp-connector/.env         # it refuses a looser mode
+   docker compose pull && docker compose up -d css
    ```
-   (Without agents, delete the `mcp-connector` service instead.)
-5. **The gateway**: `instance-template/gateway-vhost.conf.tmpl`, filled, into
-   the gateway's `conf.d/`, then reload nginx.
-6. **Check**: the welcome page on `https://pod.<domain>/`, sign up, create a pod,
-   open `https://<pod>.pod.<domain>/`. Then
-   `scripts/check-overrides.sh '' https://pod.<domain>`.
+5. **The gateway**: `instance-template/Caddyfile.tmpl` for Caddy,
+   `instance-template/gateway-vhost.conf.tmpl` for nginx; fill the
+   placeholders, add it to the gateway's config, reload.
+6. **Check**:
+   - `https://pod.<domain>/` shows the welcome page; sign up, create a pod;
+   - `curl -sI https://<pod>.pod.<domain>/ | grep -i pim` shows
+     `<http://www.w3.org/ns/pim/space#Storage>; rel="type"`;
+   - a pod named `open_fab` is refused;
+   - `scripts/check-overrides.sh '' https://pod.<domain>` is OK.
+7. **The connector** (skip, and delete its service, without agents): an agent
+   is an account of its own on this server, with a pod. Its owner makes
+   client credentials on the account page (`/.account/`), then on the VPS:
+   ```sh
+   docker compose run --rm --no-deps mcp-connector node scripts/gen-slug.js   # the agent's slug
+   ```
+   and one entry in `mcp-connector/identities.json` (`identities.example.json`
+   in the connector shows the fields). Then `docker compose up -d
+   mcp-connector`; its URL is `https://mcp.pod.<domain>/mcp/<slug>`. The slug
+   is a bearer credential: whoever has the URL acts as the agent.
 
 That is a working server with the generic pages and the "pod" skin. An own look
 comes later, in `overlay/` (its README), and needs no build.
 
 ### Wildcard certificate (DNS-01)
 
-`*.pod.<domain>` can only be issued through a DNS challenge: certbot writes a
-TXT record in the domain's zone, so it needs an API key for the DNS host, not
-access to the server. For a domain at **OVH**, the `certbot-dns-ovh` plugin:
+`*.pod.<domain>` can only be issued through a DNS challenge: the gateway writes
+a TXT record in the domain's zone, so it needs an API token for the DNS host,
+not access to the server. Being admin of the domain is enough; the VPS can be
+anywhere. For a domain at **OVH**:
 
-1. Create a token at <https://eu.api.ovh.com/createToken/> (endpoint `ovh-eu`)
-   with these rights only, limited to the one zone:
-   `GET /domain/zone/`, and `GET`, `PUT`, `POST`, `DELETE` on
-   `/domain/zone/mapsofmaking.org/*`. Being admin of the domain is enough;
-   the VPS can be anywhere.
-2. On the gateway machine, `/root/.secrets/ovh.ini`, `chmod 600`, never in a repo:
+1. **The token**, at <https://eu.api.ovh.com/createToken/> (endpoint `ovh-eu`),
+   with these rights only, so it can touch this one zone's records and nothing
+   else (replace the domain):
+   ```
+   GET    /domain/zone/mapsofmaking.org/record
+   POST   /domain/zone/mapsofmaking.org/record
+   GET    /domain/zone/mapsofmaking.org/record/*
+   PUT    /domain/zone/mapsofmaking.org/record/*
+   DELETE /domain/zone/mapsofmaking.org/record/*
+   GET    /domain/zone/mapsofmaking.org/soa
+   POST   /domain/zone/mapsofmaking.org/refresh
+   ```
+   Validity: unlimited, or the certificate stops renewing when it expires. It
+   gives three values (application key, application secret, consumer key):
+   they go on the VPS only, never in a repo or a chat.
+2. **Caddy**: stock Caddy has no DNS module. `gateway-caddy/Dockerfile` builds
+   the same Caddy with `caddy-dns/ovh`; the gateway's compose builds from it
+   instead of pulling `caddy`. The four values reach the container as
+   environment variables, from an env file next to the gateway's compose
+   (`chmod 600`, git-ignored):
+   ```sh
+   OVH_ENDPOINT=ovh-eu
+   OVH_APPLICATION_KEY=…
+   OVH_APPLICATION_SECRET=…
+   OVH_CONSUMER_KEY=…
+   ```
+   `Caddyfile.tmpl` uses them. Caddy then gets and renews the wildcard by
+   itself, and serves `mcp.pod.<domain>` from it too (Caddy 2.10 and later).
+   Check: `docker exec <caddy> caddy list-modules | grep ovh`.
+3. **nginx**: certbot's `certbot-dns-ovh` plugin, with the same values in
+   `/root/.secrets/ovh.ini` (`chmod 600`):
    ```ini
    dns_ovh_endpoint = ovh-eu
    dns_ovh_application_key = …
    dns_ovh_application_secret = …
    dns_ovh_consumer_key = …
    ```
-3. One certificate for both names:
+   One certificate for both names:
    ```sh
    docker run --rm -v /etc/letsencrypt:/etc/letsencrypt -v /root/.secrets:/secrets:ro \
      certbot/dns-ovh certonly --dns-ovh --dns-ovh-credentials /secrets/ovh.ini \
@@ -89,7 +133,8 @@ access to the server. For a domain at **OVH**, the `certbot-dns-ovh` plugin:
    Renewal runs the same plugin (`certbot renew`, same volumes): the http-01
    webroot renewal other sites on the gateway use cannot renew a wildcard.
 
-Another DNS host: the matching `certbot-dns-*` plugin, same shape.
+Another DNS host: the matching `caddy-dns/*` module or `certbot-dns-*` plugin,
+same shape.
 
 ### The welcome page
 
@@ -146,6 +191,8 @@ The skin audit (contrast, complete slot set) lives in solid-kit:
 | `pod-name-guard/` | the one component: pod names that make valid hostnames |
 | `upstream-baseline.sha256`, `scripts/check-overrides.sh` | the stock templates `overlay/` replaces, hashed |
 | `test/` | `try-local.sh` (runs the image) + `smoke.mjs` (a real browser, both layouts) |
-| `instance-template/` | what an instance copies |
+| `instance-template/` | what an instance copies: compose, `.env.example`, the Caddy and nginx gateway templates |
+| `gateway-caddy/` | Caddy + the OVH DNS module, for the wildcard certificate |
+| `docs/` | install briefs for one VPS (`handoff-mapsofmaking.md`) |
 | `mcp-connector/` | the connector's source and image |
 | `skills/css-instance/` | the method, for Claude Code; never required |

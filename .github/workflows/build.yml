@@ -32,6 +32,16 @@ jobs:
       - name: build the image
         run: docker build -t solid-css-overlay:dev .
 
+      - name: Caddy gateway builds with the OVH module, and the template parses
+        run: |
+          docker build -t caddy-ovh:ci gateway-caddy
+          docker run --rm caddy-ovh:ci caddy list-modules | grep -x dns.providers.ovh
+          sed -e 's/{{INSTANCE_NAME}}/ci/g' -e 's/{{DOMAIN}}/pod.example.org/g' \
+            instance-template/Caddyfile.tmpl > "$RUNNER_TEMP/Caddyfile"
+          docker run --rm -v "$RUNNER_TEMP/Caddyfile:/etc/caddy/Caddyfile:ro" \
+            -e OVH_ENDPOINT=ovh-eu -e OVH_APPLICATION_KEY=x -e OVH_APPLICATION_SECRET=x -e OVH_CONSUMER_KEY=x \
+            caddy-ovh:ci caddy validate --config /etc/caddy/Caddyfile
+
       - name: stock templates unchanged since the overlay was reconciled
         run: scripts/check-overrides.sh
 

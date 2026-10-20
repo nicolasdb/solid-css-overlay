@@ -1,0 +1,88 @@
+# =============================================================================
+# SERVICE: Community Solid Server ({{INSTANCE_NAME}}) + its MCP connector
+# DOMAIN:  {{DOMAIN}} and *.{{DOMAIN}}  (every pod is a subdomain)
+#          mcp.{{DOMAIN}}               (the connector; `mcp` is a reserved pod name)
+# BACKEND: containers {{INSTANCE_NAME}}-css:3000 and
+#          {{INSTANCE_NAME}}-mcp-connector:3939, on the gateway's Docker network
+# TLS:     one wildcard certificate, by DNS challenge: needs the Caddy build in
+#          gateway-caddy/ (stock Caddy has no DNS module) and the four OVH_*
+#          variables in the gateway container's environment (README,
+#          "Wildcard certificate").
+#
+# TO INSTALL: fill the placeholders, add to the gateway's Caddyfile (or a file
+# it imports), reload Caddy. For an nginx gateway: gateway-vhost.conf.tmpl.
+#
+# Placeholders: {{INSTANCE_NAME}} {{DOMAIN}}
+# Without the connector: delete the @onboard route and the mcp.{{DOMAIN}} block.
+# =============================================================================
+
+{{DOMAIN}}, *.{{DOMAIN}} {
+	# The wildcard: Let's Encrypt issues it only through the DNS challenge. A
+	# wildcard covers one level: openfab-bxl.{{DOMAIN}} yes, a.b.{{DOMAIN}} no
+	# (CSS never makes those).
+	tls {
+		dns ovh {
+			endpoint {$OVH_ENDPOINT}
+			application_key {$OVH_APPLICATION_KEY}
+			application_secret {$OVH_APPLICATION_SECRET}
+			consumer_key {$OVH_CONSUMER_KEY}
+		}
+	}
+
+	# Files people put in their pods.
+	request_body {
+		max_size 100MB
+	}
+
+	header {
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+	}
+
+	# The connector's onboarding (mint and revoke an agent's credentials). It
+	# must sit on the server's own host: it reads the `css-account` cookie,
+	# which CSS sets for {{DOMAIN}} only. Matched on that host ONLY: on a pod
+	# host, /onboard/ is the pod's own resource, and a route there would hide
+	# it on every pod.
+	@onboard {
+		host {{DOMAIN}}
+		path /onboard /onboard/*
+	}
+	handle @onboard {
+		reverse_proxy {{INSTANCE_NAME}}-mcp-connector:3939
+	}
+
+	handle {
+		# reverse_proxy passes the Host through unchanged, and CSS needs it so:
+		# the Host decides WHICH POD a request is for. Never rewrite it (ADR 002
+		# in solid-kit forbids URI rewriting at the proxy). X-Forwarded-Proto is
+		# set by Caddy; websockets (Solid notifications) need nothing more.
+		#
+		# The image trusts no 'Authorization: WebID' header (no
+		# UnsecureWebIdExtractor in its config). An instance that adds one MUST
+		# drop that header here, and only that one (DPoP and Bearer pass):
+		# @webid_auth header_regexp Authorization (?i)^WebID
+		# request_header @webid_auth -Authorization
+		reverse_proxy {{INSTANCE_NAME}}-css:3000
+	}
+}
+
+mcp.{{DOMAIN}} {
+	# No tls block: since Caddy 2.10, a name covered by a wildcard this Caddy
+	# manages uses that wildcard instead of getting its own certificate.
+
+	# No `log` directive, on purpose: the URL path carries the agent's slug,
+	# which is a bearer credential. Caddy keeps no access log unless asked.
+
+	# pocpod0 allows only Anthropic's outbound range here (claude.ai's
+	# connectors) and its own IPs; anyone else gets 403. Uncomment to do the
+	# same; it also shuts out a Claude Code or any other MCP client elsewhere.
+	# @outside not remote_ip 160.79.104.0/21 127.0.0.1/32 172.16.0.0/12
+	# respond @outside 403
+
+	reverse_proxy {{INSTANCE_NAME}}-mcp-connector:3939 {
+		# Streamable HTTP: pass each chunk on as it comes, never buffer.
+		flush_interval -1
+	}
+}

@@ -11,6 +11,10 @@
 #
 # Placeholders: {{INSTANCE_NAME}} {{DOMAIN}} {{ORDER}}
 #
+# Not here yet: the connector's routes (mcp.{{DOMAIN}}, and /onboard/ on
+# {{DOMAIN}} only). Caddyfile.tmpl has them; port them before an nginx
+# instance runs the connector.
+#
 # Any other service on this domain (mcp.{{DOMAIN}}, ...) gets its own server
 # block with an exact server_name, which nginx prefers over the wildcard: its
 # name must then be reserved in config/instance.json, or someone can create a
