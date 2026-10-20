@@ -4,7 +4,7 @@ Versions are `<stock CSS version>-<n>`: a new stock release starts at `-1`, a
 new overlay on the same stock adds one. A tag `v<version>` publishes both
 images (`.github/workflows/build.yml`).
 
-## 7.2.0-1 — unreleased
+## 7.2.0-1 — 2026-10-20
 
 First release: the overlay moves here from solid-kit `templates/css-instance/`
 (at 2772945) and the MCP connector from pocpod0 (at 356647d).
@@ -30,6 +30,10 @@ First release: the overlay moves here from solid-kit `templates/css-instance/`
   is stamped in the HTML and clears the stored choice; `pod-ui.js` resolves
   "same as this device" (High contrast first, then dark) and follows it. The
   skin's `prefers-contrast` copy of High contrast is gone. Assets at `?v=2`.
+- **Gateways**: `instance-template/Caddyfile.tmpl` beside the nginx template,
+  and `gateway-caddy/` (Caddy + `caddy-dns/ovh`) for the wildcard certificate.
+  The Caddy template also routes the connector (`mcp.<server host>`, and
+  `/onboard/` on the server's host only); the nginx one does not yet.
 - **mcp-connector**: the pod a URL belongs to is discovered (`src/podRoot.js`,
   solid-kit's rule), no longer read off the URL path; public address from
   `MCP_PUBLIC_BASE`.
