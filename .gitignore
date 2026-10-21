@@ -2,3 +2,7 @@ node_modules/
 dist/
 test/shots/
 .env
+# What an instance adds beside the template, in its checkout (instance-template/compose.yml).
+instance-template/mcp-connector/
+instance-template/overlay/*
+!instance-template/overlay/README.md

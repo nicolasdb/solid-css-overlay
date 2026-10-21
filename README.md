@@ -47,9 +47,13 @@ applied to one VPS, step by step.
 2. **DNS**: `pod` and `*.pod` (A, and AAAA if the VPS has IPv6) to the VPS.
    Check: `dig +short A anything.pod.<domain>` answers the VPS's address.
 3. **An API token for the DNS host**, for the wildcard certificate (below).
-4. **The instance**, CSS first:
+4. **The instance**, CSS first. It is a checkout of this repo at the tag it
+   runs, used from `instance-template/`: its compose stays in its own repo,
+   and an update is a `git checkout`. What the instance adds there (`.env`,
+   `mcp-connector/`, `overlay/` files) is git-ignored.
    ```sh
-   cp -r instance-template/ /srv/mapsofmaking && cd /srv/mapsofmaking
+   git clone --branch v7.2.0-2 https://github.com/nicolasdb/solid-css-overlay /srv/mapsofmaking
+   cd /srv/mapsofmaking/instance-template
    cp .env.example .env                       # every value; the comments say what
    mkdir -p mcp-connector && echo '{}' > mcp-connector/identities.json && touch mcp-connector/.env
    chown 1000:1000 mcp-connector/identities.json mcp-connector/.env   # the connector runs as uid 1000
@@ -155,8 +159,11 @@ included, and no app could read a pod's root. Checked against the image,
 
 ## Updating an instance
 
-New `CSS_OVERLAY_VERSION` in `.env`, then `docker compose pull && docker
-compose up -d`. A new stock CSS gives `7.x.y-1`; a new overlay on the same
+In the instance's checkout: `git fetch --tags && git checkout v<new>`, the
+same version as `CSS_OVERLAY_VERSION` in `instance-template/.env`, then
+`docker compose pull && docker compose up -d`. `git diff v<old> v<new> --
+instance-template/` shows what changed in the compose and the gateway
+templates (a gateway template is copied, so it is updated by hand). A new stock CSS gives `7.x.y-1`; a new overlay on the same
 stock, `-n+1` (`CHANGELOG.md`). An instance that mounts its own copy of a
 generic file diffs it against the new version first.
 
