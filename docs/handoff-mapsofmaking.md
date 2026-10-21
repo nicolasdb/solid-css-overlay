@@ -10,7 +10,7 @@ particular to Maps of Making.
 | | |
 |---|---|
 | Server address (`CSS_BASE_URL`) | `https://pod.mapsofmaking.org/` |
-| First pod | `openfab-bxl` → `https://openfab-bxl.pod.mapsofmaking.org/` |
+| Test pod | `nicolas-test` → `https://nicolas-test.pod.mapsofmaking.org/`, a throwaway. `openfab-bxl` waits until accounts can be deleted (`ROADMAP.md`): CSS 7.2 cannot delete one, and OpenFab's account must not sit among test accounts |
 | Connector (`MCP_PUBLIC_BASE`) | `https://mcp.pod.mapsofmaking.org/` |
 | `MCP_ALLOWED_HOSTS` | `mcp.pod.mapsofmaking.org,pod.mapsofmaking.org` (the second is for `/onboard/`) |
 | `INSTANCE_NAME` | `mapsofmaking`: containers `mapsofmaking-css` and `mapsofmaking-mcp-connector`, volume `mapsofmaking_css-data` |
@@ -115,8 +115,8 @@ particular to Maps of Making.
    ```
 6. **Checks** (README step 6):
    - the welcome page;
-   - Nicolas signs up and creates `openfab-bxl`;
-   - `curl -sI https://openfab-bxl.pod.mapsofmaking.org/ | grep -i pim`;
+   - Nicolas signs up and creates `nicolas-test`;
+   - `curl -sI https://nicolas-test.pod.mapsofmaking.org/ | grep -i pim`;
    - `open_fab` is refused;
    - `scripts/check-overrides.sh '' https://pod.mapsofmaking.org`, run from
      the clone on the workstation;
@@ -140,7 +140,16 @@ particular to Maps of Making.
 - Anything in the README or the templates that was wrong, missing or unclear
   for this VPS.
 
+## Between test rounds
+
+The reset in the README ("Accounts and pods"), in
+`/srv/mapsofmaking/instance-template/`. It deletes every account and pod, so
+only while the instance holds test accounts only.
+
 ## Next, not now
+
+- **Account deletion** (`ROADMAP.md`, 7.2.0-3), then OpenFab's account and
+  `openfab-bxl`.
 
 - **Backups of the `mapsofmaking_css-data` volume**: it holds every account
   and pod. This install does not set them up.

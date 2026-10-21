@@ -25,6 +25,10 @@ implement is solid-kit's ADR 006.
 The comments explaining *what went wrong before* are the most valuable content
 in these files. Keep them when changing the code around them.
 
+Planned features (account deletion, the right to erasure, ...) and their
+agreed shape: `ROADMAP.md`. What CSS itself does and does not do with
+accounts: README, "Accounts and pods".
+
 ## Commands
 
 See README, "Working on the image". The gate before a tag: both smoke runs

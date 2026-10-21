@@ -16,6 +16,9 @@ template an instance runs from, after Maps of Making's VPS inventory.
   are `<INSTANCE_NAME>_css-data` etc., no longer named after the folder.
 - **`gateway-caddy/`**: Caddy 2.11.4, alpine, the version Maps of Making's
   gateway runs; 2.10.2 would have downgraded it. Pin what the gateway runs.
+- README "Accounts and pods": the 30-minute removal of an account without a
+  login, that CSS 7.2 deletes no account and no pod, and resetting a test
+  instance. `ROADMAP.md`: admin deletion and the right to erasure.
 - `docs/handoff-mapsofmaking.md`: the inventory's facts (network `proxy`, the
   gateway in vps-infra, one recreate of the gateway, IPv6 after a check).
 

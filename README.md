@@ -167,6 +167,35 @@ templates (a gateway template is copied, so it is updated by hand). A new stock 
 stock, `-n+1` (`CHANGELOG.md`). An instance that mounts its own copy of a
 generic file diffs it against the new version first.
 
+## Accounts and pods: what CSS does and does not do
+
+Checked against the CSS 7.2.0 source, 2026-10-21.
+
+**An account with no login is removed after 30 minutes.** Signing up makes
+the account first and the email/password second. If nobody adds a login
+within 30 minutes (someone closes the page halfway), CSS removes the account
+by itself (`BaseLoginAccountStorage`, 1800 s). It is the only deletion CSS does.
+
+**CSS 7.2 cannot delete an account or a pod.** Its account API deletes:
+- a login, never the last one;
+- client credentials;
+- a WebID link;
+- a pod owner.
+
+Nothing deletes the account or the pod, so a pod name, once taken, stays
+taken, and the right to erasure cannot be honoured yet. Both are planned
+(`ROADMAP.md`).
+
+**Resetting a test instance** deletes every account and pod at once, in
+`instance-template/`:
+```sh
+docker compose down -v && docker compose up -d
+```
+It removes the `<INSTANCE_NAME>_css-data` volume and the connector's audit
+volume. The welcome page is rewritten on the next first start. Put
+`mcp-connector/identities.json` back to `{}` too: its agents' accounts are
+gone. **Never on an instance with real accounts.**
+
 ## Working on the image
 
 ```sh
@@ -201,5 +230,6 @@ The skin audit (contrast, complete slot set) lives in solid-kit:
 | `instance-template/` | what an instance copies: compose, `.env.example`, the Caddy and nginx gateway templates |
 | `gateway-caddy/` | Caddy + the OVH DNS module, for the wildcard certificate |
 | `docs/` | install briefs for one VPS (`handoff-mapsofmaking.md`) |
+| `ROADMAP.md` | planned features: account deletion, the right to erasure |
 | `mcp-connector/` | the connector's source and image |
 | `skills/css-instance/` | the method, for Claude Code; never required |
