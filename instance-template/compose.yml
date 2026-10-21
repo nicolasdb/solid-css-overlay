@@ -1,8 +1,20 @@
 # A Community Solid Server instance from the solid-css-overlay image.
-# Copy this folder, fill .env (from .env.example), then:
+# An instance is a checkout of solid-css-overlay at the tag it runs, used
+# from this folder, so its compose stays in its own repo:
+#   git clone --branch v<version> https://github.com/nicolasdb/solid-css-overlay /srv/<instance>
+#   cd /srv/<instance>/instance-template && cp .env.example .env   # then fill it
 #   docker compose pull && docker compose up -d
-# No build: both images are published (ghcr.io/nicolasdb/...). An update is a
-# new CSS_OVERLAY_VERSION in .env, then the same two commands.
+# No build: both images are published (ghcr.io/nicolasdb/...). An update is
+# `git checkout v<new>`, the same version in .env, then the same two commands.
+# What the instance adds here (.env, mcp-connector/, overlay/ files) is
+# git-ignored, so a checkout never touches it.
+
+# The project name, and so the volumes' names (<INSTANCE_NAME>_css-data holds
+# every account and pod). Without it, they would be named after this folder
+# (instance-template_css-data): the next instance on the same host would share
+# them, and moving the checkout would start an empty server.
+name: ${INSTANCE_NAME:?set INSTANCE_NAME in .env}
+
 services:
   css:
     image: ghcr.io/nicolasdb/solid-css-overlay:${CSS_OVERLAY_VERSION:?set CSS_OVERLAY_VERSION in .env}

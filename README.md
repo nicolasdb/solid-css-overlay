@@ -47,9 +47,13 @@ applied to one VPS, step by step.
 2. **DNS**: `pod` and `*.pod` (A, and AAAA if the VPS has IPv6) to the VPS.
    Check: `dig +short A anything.pod.<domain>` answers the VPS's address.
 3. **An API token for the DNS host**, for the wildcard certificate (below).
-4. **The instance**, CSS first:
+4. **The instance**, CSS first. It is a checkout of this repo at the tag it
+   runs, used from `instance-template/`: its compose stays in its own repo,
+   and an update is a `git checkout`. What the instance adds there (`.env`,
+   `mcp-connector/`, `overlay/` files) is git-ignored.
    ```sh
-   cp -r instance-template/ /srv/mapsofmaking && cd /srv/mapsofmaking
+   git clone --branch v7.2.0-2 https://github.com/nicolasdb/solid-css-overlay /srv/mapsofmaking
+   cd /srv/mapsofmaking/instance-template
    cp .env.example .env                       # every value; the comments say what
    mkdir -p mcp-connector && echo '{}' > mcp-connector/identities.json && touch mcp-connector/.env
    chown 1000:1000 mcp-connector/identities.json mcp-connector/.env   # the connector runs as uid 1000
@@ -155,10 +159,42 @@ included, and no app could read a pod's root. Checked against the image,
 
 ## Updating an instance
 
-New `CSS_OVERLAY_VERSION` in `.env`, then `docker compose pull && docker
-compose up -d`. A new stock CSS gives `7.x.y-1`; a new overlay on the same
+In the instance's checkout: `git fetch --tags && git checkout v<new>`, the
+same version as `CSS_OVERLAY_VERSION` in `instance-template/.env`, then
+`docker compose pull && docker compose up -d`. `git diff v<old> v<new> --
+instance-template/` shows what changed in the compose and the gateway
+templates (a gateway template is copied, so it is updated by hand). A new stock CSS gives `7.x.y-1`; a new overlay on the same
 stock, `-n+1` (`CHANGELOG.md`). An instance that mounts its own copy of a
 generic file diffs it against the new version first.
+
+## Accounts and pods: what CSS does and does not do
+
+Checked against the CSS 7.2.0 source, 2026-10-21.
+
+**An account with no login is removed after 30 minutes.** Signing up makes
+the account first and the email/password second. If nobody adds a login
+within 30 minutes (someone closes the page halfway), CSS removes the account
+by itself (`BaseLoginAccountStorage`, 1800 s). It is the only deletion CSS does.
+
+**CSS 7.2 cannot delete an account or a pod.** Its account API deletes:
+- a login, never the last one;
+- client credentials;
+- a WebID link;
+- a pod owner.
+
+Nothing deletes the account or the pod, so a pod name, once taken, stays
+taken, and the right to erasure cannot be honoured yet. Both are planned
+(`ROADMAP.md`).
+
+**Resetting a test instance** deletes every account and pod at once, in
+`instance-template/`:
+```sh
+docker compose down -v && docker compose up -d
+```
+It removes the `<INSTANCE_NAME>_css-data` volume and the connector's audit
+volume. The welcome page is rewritten on the next first start. Put
+`mcp-connector/identities.json` back to `{}` too: its agents' accounts are
+gone. **Never on an instance with real accounts.**
 
 ## Working on the image
 
@@ -194,5 +230,6 @@ The skin audit (contrast, complete slot set) lives in solid-kit:
 | `instance-template/` | what an instance copies: compose, `.env.example`, the Caddy and nginx gateway templates |
 | `gateway-caddy/` | Caddy + the OVH DNS module, for the wildcard certificate |
 | `docs/` | install briefs for one VPS (`handoff-mapsofmaking.md`) |
+| `ROADMAP.md` | planned features: account deletion, the right to erasure |
 | `mcp-connector/` | the connector's source and image |
 | `skills/css-instance/` | the method, for Claude Code; never required |

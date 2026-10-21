@@ -4,6 +4,24 @@ Versions are `<stock CSS version>-<n>`: a new stock release starts at `-1`, a
 new overlay on the same stock adds one. A tag `v<version>` publishes both
 images (`.github/workflows/build.yml`).
 
+## 7.2.0-2 — 2026-10-21
+
+The images are the same as 7.2.0-1's in content; this release versions the
+template an instance runs from, after Maps of Making's VPS inventory.
+
+- **An instance is a checkout at a tag** (`git clone --branch v<version>`),
+  used from `instance-template/`, so its compose stays in its own repo and an
+  update is a `git checkout`. What the instance adds there is git-ignored.
+- **`name: ${INSTANCE_NAME}`** in `instance-template/compose.yml`: the volumes
+  are `<INSTANCE_NAME>_css-data` etc., no longer named after the folder.
+- **`gateway-caddy/`**: Caddy 2.11.4, alpine, the version Maps of Making's
+  gateway runs; 2.10.2 would have downgraded it. Pin what the gateway runs.
+- README "Accounts and pods": the 30-minute removal of an account without a
+  login, that CSS 7.2 deletes no account and no pod, and resetting a test
+  instance. `ROADMAP.md`: admin deletion and the right to erasure.
+- `docs/handoff-mapsofmaking.md`: the inventory's facts (network `proxy`, the
+  gateway in vps-infra, one recreate of the gateway, IPv6 after a check).
+
 ## 7.2.0-1 — 2026-10-20
 
 First release: the overlay moves here from solid-kit `templates/css-instance/`
