@@ -4,6 +4,22 @@ Versions are `<stock CSS version>-<n>`: a new stock release starts at `-1`, a
 new overlay on the same stock adds one. A tag `v<version>` publishes both
 images (`.github/workflows/build.yml`).
 
+## 7.2.0-3 — 2026-10-22
+
+The images are the same as 7.2.0-1's in content; this release changes how an
+instance adds its own look, after a re-read of the Maps of Making install.
+
+- **An instance's overlay lives in its own repo**, started from the new
+  `overlay-template/`: its files and the `compose.override.yml` that mounts
+  them, versioned together. The checkout's `.env` loads it (`COMPOSE_FILE`,
+  `OVERLAY_DIR`). Until now the overlay was git-ignored in the checkout
+  (versioned nowhere), and turning it on meant uncommenting lines in the
+  tracked `compose.yml`, which dirtied the checkout and would have stopped
+  the next `git checkout v<new>`.
+- `instance-template/compose.yml` no longer carries the commented mounts.
+- Naming: one checkout per function; Maps of Making is `mom-pods`
+  (`/srv/mom-pods`, `/srv/mom-pods-overlay`).
+
 ## 7.2.0-2 — 2026-10-21
 
 The images are the same as 7.2.0-1's in content; this release versions the

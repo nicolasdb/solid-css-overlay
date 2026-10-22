@@ -49,11 +49,13 @@ applied to one VPS, step by step.
 3. **An API token for the DNS host**, for the wildcard certificate (below).
 4. **The instance**, CSS first. It is a checkout of this repo at the tag it
    runs, used from `instance-template/`: its compose stays in its own repo,
-   and an update is a `git checkout`. What the instance adds there (`.env`,
-   `mcp-connector/`, `overlay/` files) is git-ignored.
+   and an update is a `git checkout`. **The checkout is never edited**: what
+   the instance adds there (`.env`, `mcp-connector/`) is git-ignored, and its
+   own look lives in another repo (step 8). One checkout per function, named
+   after the instance (Maps of Making: `mom-pods`, `/srv/mom-pods`).
    ```sh
-   git clone --branch v7.2.0-2 https://github.com/nicolasdb/solid-css-overlay /srv/mapsofmaking
-   cd /srv/mapsofmaking/instance-template
+   git clone --branch v7.2.0-3 https://github.com/nicolasdb/solid-css-overlay /srv/<instance>
+   cd /srv/<instance>/instance-template
    cp .env.example .env                       # every value; the comments say what
    mkdir -p mcp-connector && echo '{}' > mcp-connector/identities.json && touch mcp-connector/.env
    chown 1000:1000 mcp-connector/identities.json mcp-connector/.env   # the connector runs as uid 1000
@@ -80,8 +82,19 @@ applied to one VPS, step by step.
    mcp-connector`; its URL is `https://mcp.pod.<domain>/mcp/<slug>`. The slug
    is a bearer credential: whoever has the URL acts as the agent.
 
-That is a working server with the generic pages and the "pod" skin. An own look
-comes later, in `overlay/` (its README), and needs no build.
+8. **The instance's own look** (optional; without it, the generic pages and
+   the "pod" skin): its skin, fonts, welcome page and extra reserved names, in
+   **a repo of the instance's own**, started from `overlay-template/`. Its
+   `compose.override.yml` mounts them; the checkout's `.env` loads it:
+   ```sh
+   git clone <the overlay repo> /srv/<instance>-overlay
+   # in /srv/<instance>/instance-template/.env:
+   COMPOSE_FILE=compose.yml:/srv/<instance>-overlay/compose.override.yml
+   OVERLAY_DIR=/srv/<instance>-overlay/overlay
+   ```
+   then `docker compose up -d`. Nothing is built; a change is a commit there,
+   `git pull`, `docker compose up -d`. `overlay-template/README.md` has the
+   details.
 
 ### Wildcard certificate (DNS-01)
 
@@ -144,11 +157,12 @@ same shape.
 
 It is the root container's `index.html`, written from the image **on first
 start only**. On an instance that already has data, a new welcome page (a new
-image version, or a new `overlay/welcome/index.html`) is copied in by hand:
+image version, or a new `welcome/index.html` in the overlay repo) is copied
+in by hand, from the instance's folder:
 
 ```sh
-docker compose cp overlay/welcome/index.html css:/data/www/index.html      # subdomain pods
-docker compose cp overlay/welcome/index.html css:/data/index.html          # config/suffix.json
+docker compose cp "$OVERLAY_DIR/welcome/index.html" css:/data/www/index.html   # subdomain pods
+docker compose cp "$OVERLAY_DIR/welcome/index.html" css:/data/index.html       # config/suffix.json
 ```
 
 Why not served from the image at every start (`static-root.json`): CSS 7.2
@@ -163,9 +177,11 @@ In the instance's checkout: `git fetch --tags && git checkout v<new>`, the
 same version as `CSS_OVERLAY_VERSION` in `instance-template/.env`, then
 `docker compose pull && docker compose up -d`. `git diff v<old> v<new> --
 instance-template/` shows what changed in the compose and the gateway
-templates (a gateway template is copied, so it is updated by hand). A new stock CSS gives `7.x.y-1`; a new overlay on the same
-stock, `-n+1` (`CHANGELOG.md`). An instance that mounts its own copy of a
-generic file diffs it against the new version first.
+templates (a gateway template is copied, so it is updated by hand), and
+`git diff v<old> v<new> -- overlay-template/` what changed for the overlay
+repo. A new stock CSS gives `7.x.y-1`; a new overlay on the same stock, `-n+1`
+(`CHANGELOG.md`). An overlay repo that mounts its own copy of a generic file
+diffs it against the new version first.
 
 ## Accounts and pods: what CSS does and does not do
 
@@ -227,7 +243,8 @@ The skin audit (contrast, complete slot set) lives in solid-kit:
 | `pod-name-guard/` | the one component: pod names that make valid hostnames |
 | `upstream-baseline.sha256`, `scripts/check-overrides.sh` | the stock templates `overlay/` replaces, hashed |
 | `test/` | `try-local.sh` (runs the image) + `smoke.mjs` (a real browser, both layouts) |
-| `instance-template/` | what an instance copies: compose, `.env.example`, the Caddy and nginx gateway templates |
+| `instance-template/` | what an instance runs from (its checkout): compose, `.env.example`, the Caddy and nginx gateway templates |
+| `overlay-template/` | what an instance's overlay repo starts from: `compose.override.yml`, `overlay/` |
 | `gateway-caddy/` | Caddy + the OVH DNS module, for the wildcard certificate |
 | `docs/` | install briefs for one VPS (`handoff-mapsofmaking.md`) |
 | `ROADMAP.md` | planned features: account deletion, the right to erasure |

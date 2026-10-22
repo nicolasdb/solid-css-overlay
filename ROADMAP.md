@@ -4,7 +4,7 @@ Features every instance will get, not built yet. Each one says why it is
 needed and the shape agreed so far. What CSS itself does and does not do
 today: README, "Accounts and pods".
 
-## Account and pod deletion, for admins (planned for 7.2.0-3)
+## Account and pod deletion, for admins (next)
 
 **Why.** CSS 7.2 deletes no account and no pod. Test rounds leave accounts
 that cannot be removed, and a pod name once taken stays taken. pocpod0
