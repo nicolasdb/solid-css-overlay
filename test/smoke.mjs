@@ -189,6 +189,10 @@ await shot(p360, "10-consent-360");
 const w = await fresh.newPage();
 await w.goto(`${base}/`);
 check(/skin\.css/.test(await w.content()), "welcome: the root page is ours (links skin.css)");
+// Until 7.2.0-4 the generic page shipped placeholders an instance had to
+// replace, and one went live showing them (pod.example.org, a dead app link).
+check((await w.textContent("#server-host")) === new URL(base).host, "welcome: the header names this server's host");
+check(!/example\.org/.test(await w.innerText("body")) && !(await w.$$eval("a[href*=\"example.org\"]", (a) => a.length)), "welcome: no placeholder host or link a visitor sees");
 await shot(w, "11-welcome");
 await w.goto(`${base}/.account/login/password/forgot/`);
 await submitReady(w);

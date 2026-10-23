@@ -3,10 +3,17 @@
   The page at the server root. Not a template: CSS copies its stock intro page
   into the root container once, when the server is first set up
   (initialize-intro.json), and from then on it is an ordinary resource,
-  /data/index.html in the data volume. This file is its source; the instance
-  copies it into the running container (see templates/css-instance/README.md).
-  It is a whole page, not wrapped by main.html.ejs, so it repeats the chrome.
-  INSTANCE: everything a visitor reads on this page is the instance's own.
+  /data/www/index.html in the data volume (/data/index.html with folder pods).
+  This file is its source; README, "The welcome page", says how a new version
+  reaches a server that already has data. It is a whole page, not wrapped by
+  main.html.ejs, so it repeats the chrome.
+
+  It must be right on any instance as it stands: until 7.2.0-4 it carried
+  placeholders for the instance to replace (pod.example.org in the header, a
+  "Pod Backoffice" row linking to backoffice.example.org), and Maps of Making,
+  with no welcome page of its own yet, went live showing both. So nothing here
+  names a host or an app. An instance's own welcome page (its overlay repo,
+  overlay/welcome/index.html) can name its apps.
 -->
 <html lang="en" data-theme="light">
 <head>
@@ -25,7 +32,11 @@
     </a>
     <div>
       <p class="brand-name">Your pod</p>
-      <div class="brand-sub">pod.example.org</div> <!-- INSTANCE: the domain (not templated here) -->
+      <div class="brand-sub" id="server-host"></div>
+      <!-- Not a template, so the host comes from the browser: this page is only
+           ever served at the server's own root. Without scripts, the line is
+           empty rather than wrong. -->
+      <script>document.getElementById("server-host").textContent = location.host;</script>
     </div>
   </header>
   <main>
@@ -44,12 +55,13 @@
       <li><b>You hand out the keys</b>An app reaches your pod only after you say yes, here, on this server.</li>
     </ul>
 
-    <!-- INSTANCE: the apps people reach from here, one row each: the link, then one
-         line saying what it is for. Remove the section if there are none. -->
+    <!-- An instance's own welcome page may add the apps people reach from here,
+         one row each, the link then one line saying what it is for:
     <h2>Apps on this pod</h2>
     <ul class="rows">
-      <li><a href="https://backoffice.example.org/">Pod Backoffice</a><span>Look after your pod: files, sharing, who sees what.</span></li>
+      <li><a href="https://app.example.org/">App name</a><span>What it is for, in one line.</span></li>
     </ul>
+    -->
 
     <p class="hint" style="margin-top: 32px">This server runs the <a href="https://communitysolidserver.github.io/">Community Solid Server</a>, an open implementation of the <a href="https://solidproject.org/">Solid</a> protocol.</p>
   </main>
