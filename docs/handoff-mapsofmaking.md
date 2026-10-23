@@ -14,7 +14,7 @@ particular to Maps of Making.
 | Connector (`MCP_PUBLIC_BASE`) | `https://mcp.pod.mapsofmaking.org/` |
 | `MCP_ALLOWED_HOSTS` | `mcp.pod.mapsofmaking.org,pod.mapsofmaking.org` (the second is for `/onboard/`) |
 | `INSTANCE_NAME` | `mom-pods`: containers `mom-pods-css` and `mom-pods-mcp-connector`, volume `mom-pods_css-data`. One checkout per function, prefix `mom-` |
-| `CSS_OVERLAY_VERSION` | `7.2.0-4`, the same as the tag checked out |
+| `CSS_OVERLAY_VERSION` | `7.2.0-5`, the same as the tag checked out |
 | `GATEWAY_NETWORK` | `proxy` |
 | DNS | OVH, zone `mapsofmaking.org`. The site on `mapsofmaking.org` lives on another server (Hetzner) and is not touched |
 | VPS | Debian 13, Docker 29.7.2, Compose v5.5.0; 3.7 GiB RAM, no swap; IPv4 `92.222.71.103`, IPv6 `2001:41d0:404:200::94de` |
@@ -129,13 +129,20 @@ particular to Maps of Making.
    - `scripts/check-overrides.sh '' https://pod.mapsofmaking.org`, run from
      the clone on the workstation;
    - Jason's sites still answer.
-7. **The connector** (README step 7). Nicolas:
+7. **The connector** (README step 7). **Waits** for two things: 7.2.0-5 (before
+   it, the connector crash-looped on an empty `identities.json`), and the
+   backoffice deploy at `backoffice.mapsofmaking.org`, whose page mints
+   agents through `/onboard/`. Then `.env` gets
+   `ONBOARD_CORS_ORIGINS=https://backoffice.mapsofmaking.org` and
+   `COMPOSE_PROFILES=connector`. How an agent is modelled (its own account,
+   or a WebID in its owner's pod as the backoffice makes it) waits for
+   solid-kit ADR 010. Until then, by hand, Nicolas:
    - creates the agent's account and pod;
    - makes client credentials for the agent on `/.account/`;
    - writes the `identities.json` entry and the agent's values into
      `instance-template/mcp-connector/` on the VPS.
 
-   Then `docker compose up -d mcp-connector`, and check
+   Then `docker compose up -d` (with the profile on), and check
    `curl -s https://mcp.pod.mapsofmaking.org/healthz`. Make one `solid_whoami`
    call from an MCP client on `https://mcp.pod.mapsofmaking.org/mcp/<slug>`.
 8. **By hand**: solid-kit `docs/manual-tests.md` (sign-in from an app,
@@ -163,6 +170,15 @@ docker compose cp ../overlay/welcome/index.html css:/data/www/index.html
 ```
 Check: `https://pod.mapsofmaking.org/` shows `pod.mapsofmaking.org` under
 "Your pod", and no "Apps on this pod" section.
+
+## Updating to 7.2.0-5 (the connector, the create-pod preview)
+
+The same steps as above with `v7.2.0-5`, minus the welcome page copy. The
+connector is now a Compose profile, off unless `.env` says
+`COMPOSE_PROFILES=connector`: `docker compose up -d` starts CSS only, and
+no longer starts a connector that crash-loops on an empty `identities.json`
+(fixed too). Keep `MCP_PUBLIC_BASE` and `MCP_ALLOWED_HOSTS` set in `.env`:
+Compose checks them even with the profile off.
 
 ## Between test rounds
 

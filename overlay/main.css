@@ -479,6 +479,8 @@ output.preview {
   overflow-wrap: anywhere;
 }
 output.preview b { color: var(--text-primary); font-weight: 500; }
+/* A name that cannot be an address: the reason, in the page's font, in place of the address. */
+output.preview.problem { font-family: inherit; color: var(--danger); }
 
 /* Welcome page: what a pod is, in three short ideas, and the apps on this pod.
    The ideas are the kit's .how-steps: each topped by a hairline, never boxed,

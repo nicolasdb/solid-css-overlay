@@ -4,6 +4,27 @@ Versions are `<stock CSS version>-<n>`: a new stock release starts at `-1`, a
 new overlay on the same stock adds one. A tag `v<version>` publishes both
 images (`.github/workflows/build.yml`).
 
+## 7.2.0-5 — 2026-10-23
+
+The bugs from the Maps of Making install brief (steps 6 and 7). Its design
+items (a provider descriptor, one model of an agent, the app's origin on the
+consent page) wait for solid-kit ADR 010.
+
+- **mcp-connector boots with no identities.** An empty `identities.json`
+  (`{}`, as the install creates it) threw "contains no identities", so a new
+  instance's connector crash-looped and `/onboard/` could never mint a first
+  agent: the 2026-08-12 deadlock again, by another path. It now boots and
+  serves `/onboard/` only, as it already did with every identity revoked.
+- **The connector is a Compose profile** (`COMPOSE_PROFILES=connector` in
+  `.env`). Off by default: `docker compose up -d` starts CSS alone. "Delete the
+  service" meant editing the checkout.
+- **`scripts/check-overrides.sh`**: `main.css` was reported stock while ours
+  (`curl | grep -q` under pipefail: SIGPIPE); the default stock image is fully
+  qualified (podman refuses short names without a TTY); the last line names
+  the failed part.
+- **Create pod**: a name that cannot be an address shows the reason under the
+  field, not `https://open_fab.<host>/`.
+
 ## 7.2.0-4 — 2026-10-23
 
 - **The welcome page is right on any instance as it stands.** It carried

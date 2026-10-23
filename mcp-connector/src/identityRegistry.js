@@ -249,13 +249,14 @@ function validateIdentities(parsed, rawText, humanFileName = "identities.json") 
     identities.set(slug, extended);
   }
 
-  if (identities.size === 0) {
-    throw new Error(
-      `${humanFileName} contains no identities. Add at least one slug entry ` +
-        `(see identities.example.json).`
-    );
-  }
-
+  // An empty file is NOT an error. A "contains no identities" throw stood
+  // here until 7.2.0-5 and repeated the 2026-08-12 deadlock that
+  // loadIdentities() below already documents for an all-revoked file: the
+  // connector refused to boot, and /onboard/mint, served by this same
+  // process, could then never make the first agent. A new instance starts
+  // with `{}` (README, install step 4), so it crash-looped under
+  // `restart: unless-stopped` (Maps of Making install, 2026-10-23).
+  // bootIdentities() boots with none and serves /onboard/ only.
   return identities;
 }
 

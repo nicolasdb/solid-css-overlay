@@ -116,6 +116,14 @@
     const preview = document.getElementById('podUrlPreview');
     const clean = (name) => name.trim().replace(/\W/gu, '-').toLowerCase();
     function updatePreview() {
+      // A name that cannot be an address gets the reason, not an address: the
+      // preview used to show https://open_fab.<host>/ beside the refusal.
+      const problem = subdomains && nameInput.value.trim() && nameProblem(nameInput.value);
+      preview.classList.toggle('problem', !!problem);
+      if (problem) {
+        preview.replaceChildren(problem);
+        return;
+      }
       const name = Object.assign(document.createElement('b'), { textContent: clean(nameInput.value) || 'your-pod-name' });
       if (subdomains) {
         preview.replaceChildren(`${server.protocol}//`, name, `.${server.host}${server.pathname}`);

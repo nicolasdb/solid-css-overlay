@@ -54,7 +54,7 @@ applied to one VPS, step by step.
    own look lives in another repo (step 8). One checkout per function, named
    after the instance (Maps of Making: `mom-pods`, `/srv/mom-pods`).
    ```sh
-   git clone --branch v7.2.0-4 https://github.com/nicolasdb/solid-css-overlay /srv/<instance>
+   git clone --branch v7.2.0-5 https://github.com/nicolasdb/solid-css-overlay /srv/<instance>
    cd /srv/<instance>/instance-template
    cp .env.example .env                       # every value; the comments say what
    mkdir -p mcp-connector && echo '{}' > mcp-connector/identities.json && touch mcp-connector/.env
@@ -71,15 +71,17 @@ applied to one VPS, step by step.
      `<http://www.w3.org/ns/pim/space#Storage>; rel="type"`;
    - a pod named `open_fab` is refused;
    - `scripts/check-overrides.sh '' https://pod.<domain>` is OK.
-7. **The connector** (skip, and delete its service, without agents): an agent
+7. **The connector** (skip without agents: it runs only when `.env` says
+   `COMPOSE_PROFILES=connector`, so a plain `docker compose up -d` starts CSS
+   alone). It boots with no identities, serving `/onboard/` only. An agent
    is an account of its own on this server, with a pod. Its owner makes
    client credentials on the account page (`/.account/`), then on the VPS:
    ```sh
    docker compose run --rm --no-deps mcp-connector node scripts/gen-slug.js   # the agent's slug
    ```
    and one entry in `mcp-connector/identities.json` (`identities.example.json`
-   in the connector shows the fields). Then `docker compose up -d
-   mcp-connector`; its URL is `https://mcp.pod.<domain>/mcp/<slug>`. The slug
+   in the connector shows the fields). Then `COMPOSE_PROFILES=connector` in
+   `.env` and `docker compose up -d`; its URL is `https://mcp.pod.<domain>/mcp/<slug>`. The slug
    is a bearer credential: whoever has the URL acts as the agent.
 
 8. **The instance's own look** (optional; without it, the generic pages and

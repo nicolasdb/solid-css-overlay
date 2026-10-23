@@ -43,9 +43,13 @@ services:
     # second way in that skips the gateway's TLS and header stripping.
     networks: [default, gateway]
 
-  # The MCP connector: agents read and write pods through it. Optional; delete
-  # this service if the instance has no agents.
+  # The MCP connector: agents read and write pods through it. Optional, and
+  # off unless .env says COMPOSE_PROFILES=connector: a plain `docker compose
+  # up -d` then starts CSS only. Until 7.2.0-5 it was on by default, with
+  # "delete this service" for an instance without agents, which meant editing
+  # this file, and the checkout is never edited.
   mcp-connector:
+    profiles: [connector]
     image: ghcr.io/nicolasdb/solid-mcp-connector:${CSS_OVERLAY_VERSION}
     container_name: ${INSTANCE_NAME}-mcp-connector
     restart: unless-stopped
@@ -55,11 +59,11 @@ services:
       - SOLID_OIDC_ISSUER=${CSS_BASE_URL}
       # Its public address (upload links, onboarding). Required: unset, the
       # connector would fall back to pod.nicolasdb.eu's.
-      - MCP_PUBLIC_BASE=${MCP_PUBLIC_BASE:?set MCP_PUBLIC_BASE in .env, or delete this service}
+      - MCP_PUBLIC_BASE=${MCP_PUBLIC_BASE:?set MCP_PUBLIC_BASE in .env (needed even with the connector profile off)}
       # Every Host the connector answers on (the SDK's DNS-rebinding check):
       # its own vhost, and the server's if /onboard/ is proxied there.
       # Required: empty turns the check off.
-      - ALLOWED_HOSTS=${MCP_ALLOWED_HOSTS:?set MCP_ALLOWED_HOSTS in .env, or delete this service}
+      - ALLOWED_HOSTS=${MCP_ALLOWED_HOSTS:?set MCP_ALLOWED_HOSTS in .env (needed even with the connector profile off)}
       - ONBOARD_CORS_ORIGINS=${ONBOARD_CORS_ORIGINS:-}
       # Empty: graph_query and graph_ingest answer "unavailable", the rest works.
       - OXIGRAPH_URL=${OXIGRAPH_URL:-}

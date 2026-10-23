@@ -61,6 +61,9 @@ if (layout === "subdomain") {
   const refused = await page.waitForFunction(() => document.getElementById("error")?.textContent.trim(), null, { timeout: 5000 })
     .then((h) => h.jsonValue(), () => "");
   check(/cannot be a pod name/.test(refused), `create pod: the form refuses "open_fab" (got "${refused}")`);
+  // Until 7.2.0-5 the preview still showed https://open_fab.<host>/ beside the refusal.
+  const badPreview = await page.textContent("#podUrlPreview");
+  check(!/open_fab\./.test(badPreview) && /cannot be a pod name/.test(badPreview), `create pod: the preview gives the reason, not an address, for "open_fab" (got "${badPreview}")`);
   check(await page.$eval("#response", (r) => r.classList.contains("hidden")), "create pod: no pod made for \"open_fab\"");
   await shot(page, "02b-create-pod-refused");
   const { controls } = await (await page.request.get(`${base}/.account/`, { headers: { accept: "application/json" } })).json();
