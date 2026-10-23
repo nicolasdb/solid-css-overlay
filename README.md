@@ -54,7 +54,7 @@ applied to one VPS, step by step.
    own look lives in another repo (step 8). One checkout per function, named
    after the instance (Maps of Making: `mom-pods`, `/srv/mom-pods`).
    ```sh
-   git clone --branch v7.2.0-3 https://github.com/nicolasdb/solid-css-overlay /srv/<instance>
+   git clone --branch v7.2.0-4 https://github.com/nicolasdb/solid-css-overlay /srv/<instance>
    cd /srv/<instance>/instance-template
    cp .env.example .env                       # every value; the comments say what
    mkdir -p mcp-connector && echo '{}' > mcp-connector/identities.json && touch mcp-connector/.env
@@ -164,6 +164,9 @@ in by hand, from the instance's folder:
 docker compose cp "$OVERLAY_DIR/welcome/index.html" css:/data/www/index.html   # subdomain pods
 docker compose cp "$OVERLAY_DIR/welcome/index.html" css:/data/index.html       # config/suffix.json
 ```
+
+Without a welcome page of its own, the instance copies the image's generic one
+from its checkout, `../overlay/welcome/index.html`, the same way.
 
 Why not served from the image at every start (`static-root.json`): CSS 7.2
 matches static files on the path alone, ignoring the host, so with subdomain

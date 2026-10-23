@@ -14,7 +14,7 @@ particular to Maps of Making.
 | Connector (`MCP_PUBLIC_BASE`) | `https://mcp.pod.mapsofmaking.org/` |
 | `MCP_ALLOWED_HOSTS` | `mcp.pod.mapsofmaking.org,pod.mapsofmaking.org` (the second is for `/onboard/`) |
 | `INSTANCE_NAME` | `mom-pods`: containers `mom-pods-css` and `mom-pods-mcp-connector`, volume `mom-pods_css-data`. One checkout per function, prefix `mom-` |
-| `CSS_OVERLAY_VERSION` | `7.2.0-3`, the same as the tag checked out |
+| `CSS_OVERLAY_VERSION` | `7.2.0-4`, the same as the tag checked out |
 | `GATEWAY_NETWORK` | `proxy` |
 | DNS | OVH, zone `mapsofmaking.org`. The site on `mapsofmaking.org` lives on another server (Hetzner) and is not touched |
 | VPS | Debian 13, Docker 29.7.2, Compose v5.5.0; 3.7 GiB RAM, no swap; IPv4 `92.222.71.103`, IPv6 `2001:41d0:404:200::94de` |
@@ -147,6 +147,22 @@ particular to Maps of Making.
 - Memory after steps 4 and 7.
 - Anything in the README or the templates that was wrong, missing or unclear
   for this VPS.
+
+## Updating to 7.2.0-4 (the welcome page)
+
+7.2.0-3 went live with the generic welcome page's placeholders: the header
+said `pod.example.org` and "Apps on this pod" linked to
+`backoffice.example.org`. 7.2.0-4 fixes the page, but the server copied the
+old one into its data on first start, so it is replaced by hand once. In
+`/srv/mom-pods`:
+```sh
+git fetch --tags && git checkout v7.2.0-4
+# set CSS_OVERLAY_VERSION=7.2.0-4 in instance-template/.env (Nicolas)
+cd instance-template && docker compose pull && docker compose up -d
+docker compose cp ../overlay/welcome/index.html css:/data/www/index.html
+```
+Check: `https://pod.mapsofmaking.org/` shows `pod.mapsofmaking.org` under
+"Your pod", and no "Apps on this pod" section.
 
 ## Between test rounds
 

@@ -4,6 +4,18 @@ Versions are `<stock CSS version>-<n>`: a new stock release starts at `-1`, a
 new overlay on the same stock adds one. A tag `v<version>` publishes both
 images (`.github/workflows/build.yml`).
 
+## 7.2.0-4 — 2026-10-23
+
+- **The welcome page is right on any instance as it stands.** It carried
+  placeholders an instance had to replace: `pod.example.org` in the header,
+  and an "Apps on this pod" row linking to `backoffice.example.org`. Maps of
+  Making went live on 7.2.0-3 showing both. The header now shows the
+  server's own host (from the browser: the page is not a template), and the
+  apps section is an example in a comment, for an instance's own welcome
+  page. The smoke run checks both.
+- A server already running keeps its old copy (it is written into the data
+  on first start): copy the new one in by hand (README, "The welcome page").
+
 ## 7.2.0-3 — 2026-10-22
 
 The images are the same as 7.2.0-1's in content; this release changes how an
