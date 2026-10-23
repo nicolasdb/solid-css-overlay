@@ -51,3 +51,39 @@ It asks for the password again before deleting.
   `/onboard/` on the server's host only. `Caddyfile.tmpl` has them.
 - **Backups of the `css-data` volume**: every account and pod lives there. An
   instance has none until someone sets them up.
+
+## Next stock CSS
+
+Checked 2026-10-23 by building the overlay on stock's unreleased images
+(`stock-watch.yml`, job `ahead`, now weekly). Nothing to do before a release;
+this is what that release will ask.
+
+**7.3** (CSS main, Docker `edge`; its package still says 7.2.0). The image
+builds and both smoke runs pass, but two stock pages the overlay replaces
+changed, and both changes are a feature the overlay would hide:
+- `identity/oidc/consent.html.ejs` and `identity/account/resource.html.ejs`
+  gain a **"recover WebID"** link, to the new `recoverWebId` account control:
+  an account restores a WebID profile in one of its pods that is missing,
+  private or has a broken authorization (the server backs it up first). On
+  consent: "If an application cannot read or use a WebID hosted in one of your
+  pods, do not continue here: recover it first". Both pages show the link
+  only when `controls.html.account.recoverWebId` exists, so the merged
+  templates also run on 7.2.
+- A new opt-in config, `util/resource-locker/file-capped.json`, caps file
+  locks at one hour. The overlay uses the uncapped file locker; worth taking
+  if stale locks show up.
+
+So `7.3.0-1` = merge both templates (the link in the overlay's words), decide
+on the capped locker, `--rebaseline`.
+
+**8.0** (alpha.3, Docker `next`, Node 22; no release since March 2026). The
+overlay does **not start** on it: `PodNameGuard.jsonld` refers to the
+Components.js context of `@solid/community-server` `^7.0.0`. What an 8.0
+image will need, no work before a release candidate:
+- `pod-name-guard`: depend on `^8`, rebuild (its stage already uses the stock
+  image's Node); check `IdentifierGenerator` and `BadRequestHttpError` are
+  still exported;
+- `config/instance.json`: the `^8.0.0` context, and the authorization imports,
+  which 8.0 reorganises around `@solidlab/policy-engine`;
+- every replaced template, against 8.0's (its alpha's create-pod still lacks
+  7.2's "link storage" option, so the alphas predate 7.2 and will move again).

@@ -23,7 +23,8 @@ cd "$(dirname "$0")/.."
 CLI="${CONTAINER_CLI:-$(command -v docker || echo podman)}"
 [ -f /run/.containerenv ] && [ -z "${CONTAINER_CLI:-}" ] && CLI="distrobox-host-exec podman"
 BASELINE=upstream-baseline.sha256
-IMAGE_DEFAULT="solidproject/community-server:$(sed -n 's/^ARG CSS_VERSION=//p' Dockerfile | head -1)"
+# Fully qualified: podman refuses a short name without a TTY to ask on.
+IMAGE_DEFAULT="docker.io/solidproject/community-server:$(sed -n 's/^ARG CSS_VERSION=//p' Dockerfile | head -1)"
 
 stock_hashes() { # image -> "hash  path" lines for every overridden template
   local paths; paths="$(grep -v '^#' "$BASELINE" | awk '{print $2}' | sed 's/\$/\\$/g' | tr '\n' ' ')"
@@ -38,9 +39,11 @@ if [ "${1:-}" = "--rebaseline" ]; then
 fi
 
 image="${1:-$IMAGE_DEFAULT}"; url="${2:-}"; md_url="${3:-}"
-fail=0
+# Part 2 runs even when part 1 fails, on purpose: one run reports everything.
+# The last line names the parts that failed; the exit code is non-zero if any did.
+fail=0; failed_parts=""; part=1
 ok()  { echo "  ok    $*"; }
-bad() { echo "  FAIL  $*"; fail=1; }
+bad() { echo "  FAIL  $*"; fail=1; case " $failed_parts " in *" $part "*) ;; *) failed_parts="$failed_parts $part";; esac; }
 
 echo "1. upstream templates in $image vs $BASELINE"
 actual="$(stock_hashes "$image")" || { bad "could not read templates from $image"; exit 1; }
@@ -51,11 +54,14 @@ done < <(grep -v '^#' "$BASELINE")
 
 if [ -n "$url" ]; then
   url="${url%/}"
-  echo "2. served by $url"
+  part=2; echo "2. served by $url"
   page="$(curl -fsS -H "Accept: text/html" "$url/.account/login/password/")" || bad "login page unreachable"
   grep -q "Stale-sign-in self-repair" <<<"$page" && ok "main.html.ejs is ours" || bad "main.html.ejs is stock"
   grep -q "doc-view.js" <<<"$page" && ok "template loads doc-view.js" || bad "template does not load doc-view.js"
-  curl -fsS "$url/.well-known/css/styles/main.css" | grep -q "Story 7.2" && ok "main.css is ours" || bad "main.css is stock"
+  # Never `curl | grep -q` here: under pipefail, grep -q exits at the first
+  # match, curl dies of SIGPIPE (exit 23), and a stylesheet that IS ours was
+  # reported stock (Maps of Making install, 2026-10-23).
+  grep -q "Story 7.2" <<<"$(curl -fsS "$url/.well-known/css/styles/main.css")" && ok "main.css is ours" || bad "main.css is stock"
   # doc-view.* only if the instance serves the solid-kit document page (config.json).
   for a in .well-known/css/styles/skin.css .well-known/css/scripts/pod-ui.js .well-known/css/scripts/pod-layout.js doc-view.css doc-view.js; do
     code="$(curl -s -o /dev/null -w '%{http_code}' "$url/$a")"
@@ -66,5 +72,5 @@ if [ -n "$url" ]; then
   fi
 fi
 
-[ "$fail" = 0 ] && echo "all checks passed" || echo "CHECKS FAILED"
+[ "$fail" = 0 ] && echo "all checks passed" || echo "CHECKS FAILED in part(s):$failed_parts"
 exit "$fail"
