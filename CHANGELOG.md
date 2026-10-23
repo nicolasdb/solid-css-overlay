@@ -24,6 +24,13 @@ consent page) wait for solid-kit ADR 010.
   the failed part.
 - **Create pod**: a name that cannot be an address shows the reason under the
   field, not `https://open_fab.<host>/`.
+- **Ahead of stock**: `stock-watch.yml` also builds the overlay weekly on
+  stock's unreleased images (`edge`, `next`) with the same checks as a tag,
+  and opens an issue when one breaks. First run, by hand: 7.3 adds a
+  "recover WebID" link to two pages the overlay replaces; 8.0's alpha does
+  not load `PodNameGuard`. ROADMAP, "Next stock CSS".
+- The `PodNameGuard` build stage is the stock image itself (was
+  `node:18-slim`), so the component is tested on the Node it runs on.
 
 ## 7.2.0-4 — 2026-10-23
 

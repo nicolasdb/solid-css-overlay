@@ -33,3 +33,93 @@ jobs:
             "2. \`scripts/check-overrides.sh solidproject/community-server:$latest\`: merge every template it flags into overlay/, then \`--rebaseline\`." \
             "3. \`ARG CSS_VERSION=$latest\` in the Dockerfile, \`@solid/community-server\` in pod-name-guard/package.json; rebuild, smoke both layouts." \
             "4. CHANGELOG \`## $latest-1\`, tag \`v$latest-1\`.")"
+
+  # Ahead of a release: the overlay built on stock's unreleased images, with
+  # the same checks a tag gets. `edge` is CSS main (the next 7.x), `next` the
+  # 8.0 line. A failure opens (or comments on) one issue per tag and blocks
+  # nothing; a pass closes it. Added 2026-10-23, when edge already carried 7.3's
+  # "recover WebID" link on two pages the overlay replaces, so the overlay
+  # would have hidden it on release day without a word.
+  ahead:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        tag: [edge, next]
+    env:
+      TAG: ${{ matrix.tag }}
+      STOCK: docker.io/solidproject/community-server:${{ matrix.tag }}
+      CONTAINER_CLI: docker
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: what the tag carries
+        id: version
+        run: |
+          docker pull -q "$STOCK"
+          v="$(docker run --rm --entrypoint node "$STOCK" -p 'require("/community-server/package.json").version + " (node " + process.version + ")"')"
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "$TAG is $v"
+      - name: stock templates the overlay replaces, unchanged?
+        id: overrides
+        continue-on-error: true
+        run: scripts/check-overrides.sh "$STOCK"
+      - name: the image builds on it
+        id: build
+        continue-on-error: true
+        run: docker build --build-arg CSS_VERSION="$TAG" -t "solid-css-overlay:$TAG" .
+      - name: browser for the smoke run
+        if: steps.build.outcome == 'success'
+        working-directory: test
+        run: npm ci && npx playwright install --with-deps chromium
+      - name: smoke, subdomain pods
+        id: smoke_subdomain
+        if: steps.build.outcome == 'success'
+        continue-on-error: true
+        env: { POD_LAYOUT: subdomain, IMAGE: "solid-css-overlay:${{ matrix.tag }}" }
+        run: |
+          test/try-local.sh 3123
+          node test/smoke.mjs http://localhost:3123 "test/shots/$TAG-subdomain"
+      - name: smoke, folder pods
+        id: smoke_suffix
+        if: steps.build.outcome == 'success'
+        continue-on-error: true
+        env: { POD_LAYOUT: suffix, IMAGE: "solid-css-overlay:${{ matrix.tag }}" }
+        run: |
+          docker rm -f try-css-overlay-3123 >/dev/null 2>&1 || true
+          test/try-local.sh 3124
+          node test/smoke.mjs http://localhost:3124 "test/shots/$TAG-suffix"
+      - name: screenshots
+        if: always() && steps.build.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ahead-${{ matrix.tag }}-shots
+          path: test/shots/
+      - name: report
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+          OVERRIDES: ${{ steps.overrides.outcome }}
+          BUILD: ${{ steps.build.outcome }}
+          SMOKE_SUBDOMAIN: ${{ steps.smoke_subdomain.outcome }}
+          SMOKE_SUFFIX: ${{ steps.smoke_suffix.outcome }}
+          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          failed=""
+          [ "$OVERRIDES" = success ] || failed="$failed\n- a stock template the overlay replaces changed: scripts/check-overrides.sh $STOCK"
+          [ "$BUILD" = success ] || failed="$failed\n- the image does not build on $TAG"
+          [ "$BUILD" != success ] || [ "$SMOKE_SUBDOMAIN" = success ] || failed="$failed\n- smoke, subdomain pods"
+          [ "$BUILD" != success ] || [ "$SMOKE_SUFFIX" = success ] || failed="$failed\n- smoke, folder pods"
+          prefix="Ahead of stock: $TAG"
+          open="$(gh issue list --state open --search "\"$prefix\" in:title" --json number --jq '.[0].number // empty')"
+          if [ -z "$failed" ]; then
+            echo "$TAG ($VERSION): all checks passed"
+            [ -n "$open" ] && gh issue close "$open" --comment "Passes again on $TAG ($VERSION): $RUN"
+            exit 0
+          fi
+          body="$(printf "Stock \`%s\` is %s. Not released yet: nothing to do before it is, except to know.\n\nFailed:%b\n\nRun and screenshots: %s\nWhat is known so far: ROADMAP.md, \"Next stock CSS\"." "$TAG" "$VERSION" "$failed" "$RUN")"
+          if [ -n "$open" ]; then gh issue comment "$open" --body "$body"
+          else gh issue create --title "$prefix ($VERSION) breaks the overlay" --body "$body"; fi
