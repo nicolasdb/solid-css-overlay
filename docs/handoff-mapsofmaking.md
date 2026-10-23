@@ -13,8 +13,8 @@ particular to Maps of Making.
 | Test pod | `nicolas-test` → `https://nicolas-test.pod.mapsofmaking.org/`, a throwaway. `openfab-bxl` waits until accounts can be deleted (`ROADMAP.md`): CSS 7.2 cannot delete one, and OpenFab's account must not sit among test accounts |
 | Connector (`MCP_PUBLIC_BASE`) | `https://mcp.pod.mapsofmaking.org/` |
 | `MCP_ALLOWED_HOSTS` | `mcp.pod.mapsofmaking.org,pod.mapsofmaking.org` (the second is for `/onboard/`) |
-| `INSTANCE_NAME` | `mapsofmaking`: containers `mapsofmaking-css` and `mapsofmaking-mcp-connector`, volume `mapsofmaking_css-data` |
-| `CSS_OVERLAY_VERSION` | `7.2.0-2`, the same as the tag checked out |
+| `INSTANCE_NAME` | `mom-pods`: containers `mom-pods-css` and `mom-pods-mcp-connector`, volume `mom-pods_css-data`. One checkout per function, prefix `mom-` |
+| `CSS_OVERLAY_VERSION` | `7.2.0-3`, the same as the tag checked out |
 | `GATEWAY_NETWORK` | `proxy` |
 | DNS | OVH, zone `mapsofmaking.org`. The site on `mapsofmaking.org` lives on another server (Hetzner) and is not touched |
 | VPS | Debian 13, Docker 29.7.2, Compose v5.5.0; 3.7 GiB RAM, no swap; IPv4 `92.222.71.103`, IPv6 `2001:41d0:404:200::94de` |
@@ -30,7 +30,13 @@ particular to Maps of Making.
   gateway only.
 - **The instance's compose stays in its own repo**, solid-css-overlay, as
   vps-infra's README requires: the instance is a checkout of it at
-  `/srv/mapsofmaking`.
+  `/srv/mom-pods`, never edited.
+- **Maps of Making's own look** (skin, fonts, welcome page, more reserved
+  names) lives in the repo `mapsofmaking/mom-pods-overlay`, checked out at
+  `/srv/mom-pods-overlay`. Nicolas creates it from solid-css-overlay's
+  `overlay-template/`. It is optional at first: without it, the generic look.
+  The checkout's `.env` loads it (README "Install from scratch", step 8).
+- One checkout per function, prefix `mom-`.
 
 ## Rules for this session
 
@@ -39,8 +45,8 @@ particular to Maps of Making.
   instance is a checkout at a tag. The only files written by hand on the VPS
   are the git-ignored ones that hold values:
   - `/srv/infra/gateway/.env`;
-  - `/srv/mapsofmaking/instance-template/.env`;
-  - `/srv/mapsofmaking/instance-template/mcp-connector/*`.
+  - `/srv/mom-pods/instance-template/.env`;
+  - `/srv/mom-pods/instance-template/mcp-connector/*`.
 - **Secrets never pass through the conversation or a repo**:
   - the OVH token's values;
   - agent client secrets;
@@ -77,7 +83,7 @@ particular to Maps of Making.
      ```
      should answer `92.222.71.103`.
 3. **Caddy with the OVH module, in vps-infra `gateway/`**:
-   - Copy `gateway-caddy/Dockerfile` from solid-css-overlay at `v7.2.0-2` to
+   - Copy `gateway-caddy/Dockerfile` from solid-css-overlay at `v7.2.0-3` to
      `gateway/Dockerfile`. Its default `CADDY_VERSION=2.11.4` is the running
      version.
    - In `gateway/docker-compose.yml`, replace `image: caddy:2-alpine` with
@@ -97,15 +103,17 @@ particular to Maps of Making.
        `dns.providers.ovh`;
      - `docker exec gateway-caddy caddy version` shows 2.11.4.
 4. **The instance**: README "Install from scratch" step 4, with
-   `/srv/mapsofmaking` and the values above. Start `css` only. Then:
+   `/srv/mom-pods` and the values above. If `/srv/mapsofmaking` or a volume
+   `mapsofmaking_css-data` exists from before the rename, remove it first:
+   neither holds anything yet. Start `css` only. Then:
    ```sh
    docker compose ps
    docker stats --no-stream
    ```
    With 3.7 GiB and no swap, report the memory.
 5. **The site block, in vps-infra**: `instance-template/Caddyfile.tmpl` with
-   `{{INSTANCE_NAME}}=mapsofmaking` and `{{DOMAIN}}=pod.mapsofmaking.org`
-   becomes `gateway/sites/mapsofmaking.caddy`. Then commit, push and pull, and
+   `{{INSTANCE_NAME}}=mom-pods` and `{{DOMAIN}}=pod.mapsofmaking.org`
+   becomes `gateway/sites/mom-pods.caddy`. Then commit, push and pull, and
    run vps-infra's own reload: `caddy validate`, then `caddy reload`, with no
    restart. Caddy's log should show the certificate obtained for
    `*.pod.mapsofmaking.org` within a minute or two, because the DNS challenge
@@ -143,18 +151,17 @@ particular to Maps of Making.
 ## Between test rounds
 
 The reset in the README ("Accounts and pods"), in
-`/srv/mapsofmaking/instance-template/`. It deletes every account and pod, so
+`/srv/mom-pods/instance-template/`. It deletes every account and pod, so
 only while the instance holds test accounts only.
 
 ## Next, not now
 
-- **Account deletion** (`ROADMAP.md`, 7.2.0-3), then OpenFab's account and
+- **Account deletion** (`ROADMAP.md`), then OpenFab's account and
   `openfab-bxl`.
 
-- **Backups of the `mapsofmaking_css-data` volume**: it holds every account
+- **Backups of the `mom-pods_css-data` volume**: it holds every account
   and pod. This install does not set them up.
-- Maps of Making's own skin and words (`instance-template/overlay/`,
-  git-ignored there).
-- vps-infra housekeeping:
-  - `docs/reference/server-layout.md` still says `/srv/gateway`;
-  - the old `/srv/gateway` and `/srv/portainer` copies are still on the VPS.
+- Maps of Making's own skin and words: the `mom-pods-overlay` repo
+  (above), then README step 8.
+- vps-infra housekeeping: the old `/srv/gateway` and `/srv/portainer` copies
+  are still on the VPS.

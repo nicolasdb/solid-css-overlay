@@ -25,17 +25,13 @@ services:
       # its host: https://pod.example.org/ gives https://<name>.pod.example.org/.
       # It is every WebID's and every link's prefix: choose it once.
       - CSS_BASE_URL=${CSS_BASE_URL:?set CSS_BASE_URL in .env}
-      # Uncomment for an instance that already has pods as folders (README).
-      # - CSS_CONFIG=/config/suffix.json
     volumes:
       - css-data:/data
-      # The instance's own look and words, mounted over the image's (overlay/README.md).
-      # Uncomment what exists in ./overlay.
-      # - ./overlay/skin.css:/community-server/templates/styles/skin.css:ro
-      # - ./overlay/fonts:/community-server/templates/fonts/skin:ro
-      # - ./overlay/welcome/index.html:/community-server/templates/root/intro/base/index.html:ro
-      # More reserved pod names than the image's list: a copy of config/instance.json.
-      # - ./overlay/instance.json:/config/instance.json:ro
+      # The instance's own look and words (skin, fonts, welcome page, more
+      # reserved names, folder pods) are NOT mounted here: this file is in
+      # the checkout, which is never edited. They live in the instance's
+      # overlay repo with the compose.override.yml that mounts them
+      # (overlay-template/), and .env points Compose at it (COMPOSE_FILE).
     healthcheck:
       test: ["CMD-SHELL", "node -e \"require('net').createConnection(3000,'localhost').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))\""]
       interval: 10s

@@ -45,6 +45,10 @@ tests, `scripts/check-overrides.sh`.
 - **The pages never assume a layout.** A pod's address comes from the server's
   answer or from `window.podLayout`; a WebID is split for display only.
 - **The connector never derives a pod root from a URL's shape**: `src/podRoot.js`.
+- **An instance's checkout of this repo is never edited.** What it adds by
+  hand is git-ignored (`.env`, `mcp-connector/`); its look and the override
+  that mounts it live in its own overlay repo (`overlay-template/`). A
+  feature that needs an instance to edit a tracked file is designed wrong.
 - The create-pod form and `PodNameGuard` say the same thing in the same words;
   change both.
 - `overlay/doc-view/` is generated in solid-kit (`scripts/export-doc-view.sh`);
