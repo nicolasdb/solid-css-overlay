@@ -1,35 +1,56 @@
-# <instance>-overlay
+# pods/ — the pods' look and words
 
-The look and words of one Community Solid Server instance that runs
-[solid-css-overlay](https://github.com/nicolasdb/solid-css-overlay). Started
-from that repo's `overlay-template/`.
+A folder of a vertical's **design-system repo** (solid-kit ADR 011), started
+from solid-css-overlay's `overlay-template/`. Maps of Making's is
+`mapsofmaking/design-system`, folder `pods/`, checked out on the VPS at
+`/srv/mom-design-system`, beside the instance's checkout `/srv/mom-pods`.
 
-| Path | What |
-|---|---|
-| `overlay/` | the files (its README lists them, and what each replaces) |
-| `compose.override.yml` | mounts them over the image's copies |
+The design-system repo, as ADR 011 lays it out:
+
+| Path | What | Read by |
+|---|---|---|
+| `tokens/` | the vertical's tokens, fonts and logos, in its own names | its own apps (the map, the landing) |
+| `skins/kit/skin.css` | those tokens mapped onto the kit's slots: the **complete** slot set, in every theme it offers; its CI runs solid-kit's `npm run audit -- --skin skins/kit/skin.css` | every horizontal image: the pods (this override), the backoffice |
+| `skins/kit/fonts/` | the skin's font files | the same |
+| `pods/` | this folder: the pods' own words, and the override that mounts all of it | solid-css-overlay |
+| `backoffice/` | the backoffice's own values | solid-backoffice |
+
+## What goes in `pods/`
+
+Empty but for `compose.override.yml` is fine: the image serves the generic
+pages, with the kit skin once `skins/kit/skin.css` exists.
+
+| File | Replaces | Notes |
+|---|---|---|
+| `welcome/index.html` | the welcome page | written into the data **once, on first start**; afterwards see the image README, "The welcome page". May list the vertical's apps (the commented example in the image's page). |
+| `instance.json` | `config/instance.json` | only to reserve more pod names (every service host the gateway serves under this domain) |
+
+The skin's fonts are served by this image from the mounted `skins/kit/fonts/`,
+at `/.well-known/css/fonts/skin/<file>`. Font URLs in a skin shared with the
+backoffice must resolve in both images: ADR 011 leaves that open.
+
+Any other generic file can be mounted the same way, at the path the image's
+Dockerfile copies it to. That is allowed drift: `scripts/check-overrides.sh`
+in solid-css-overlay tells you what diverges from the version you pin.
 
 ## On the VPS
 
-One checkout per function, beside the instance's checkout of
-solid-css-overlay (Maps of Making: `/srv/mom-pods` and `/srv/mom-pods-overlay`):
-
 ```sh
-git clone <this repo> /srv/<instance>-overlay
+git clone <the design-system repo> /srv/<vertical>-design-system
 ```
 
 In `/srv/<instance>/instance-template/.env`:
 
 ```sh
-COMPOSE_FILE=compose.yml:/srv/<instance>-overlay/compose.override.yml
-OVERLAY_DIR=/srv/<instance>-overlay/overlay
+COMPOSE_FILE=compose.yml:/srv/<vertical>-design-system/pods/compose.override.yml
+DESIGN_SYSTEM=/srv/<vertical>-design-system
 ```
 
 Then, in `/srv/<instance>/instance-template/`: `docker compose up -d`.
 
-**A change** is a commit here, then `git pull` in `/srv/<instance>-overlay`
-and `docker compose up -d` in the instance's folder. Nothing is built, and
-nothing is edited on the VPS.
+**A change** of look is a commit in the design-system repo, then `git pull` in
+`/srv/<vertical>-design-system` and `docker compose up -d` in the instance's
+folder. No image is rebuilt, and nothing is edited on the VPS.
 
 **A new solid-css-overlay version**: diff its `overlay-template/` against the
 previous one, and any generic file copied here against the image's new copy.

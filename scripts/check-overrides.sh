@@ -67,6 +67,16 @@ if [ -n "$url" ]; then
     code="$(curl -s -o /dev/null -w '%{http_code}' "$url/$a")"
     [ "$code" = 200 ] && ok "/$a served" || bad "/$a -> $code (not in the image, or a mount hides it)"
   done
+  # What this instance offers (solid-kit ADR 010): a public contract apps read.
+  desc="$(curl -fsS "$url/.well-known/css/provider.json")" || desc=""
+  if [ -z "$desc" ]; then bad "/.well-known/css/provider.json not served"
+  elif ! layout="$(node -e 'const d = JSON.parse(require("fs").readFileSync(0, "utf8")); if (d.software !== "solid-css-overlay" || !d.capabilities || !d.capabilities.account) process.exit(1); process.stdout.write(d.layout)' <<<"$desc" 2>/dev/null)"; then
+    bad "provider.json is not a solid-css-overlay descriptor"
+  else
+    ok "provider.json served ($layout pods, offers: $(node -e 'process.stdout.write(Object.keys(JSON.parse(require("fs").readFileSync(0, "utf8")).capabilities).join(", "))' <<<"$desc"))"
+    grep -q "podLayout = \"$layout\"" <<<"$(curl -fsS "$url/.well-known/css/scripts/pod-layout.js")" \
+      && ok "pod-layout.js says $layout too" || bad "pod-layout.js disagrees with provider.json ($layout)"
+  fi
   if [ -n "$md_url" ]; then
     curl -fsS -H 'Accept: text/html' "$md_url" | grep -q "doc-view.js" && ok ".md page carries doc-view" || bad ".md page lacks doc-view"
   fi

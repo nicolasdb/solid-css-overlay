@@ -1,29 +1,34 @@
-# An instance's own look and words, mounted over the image's copies.
-# This file lives in the instance's overlay repo (copied from solid-css-overlay
-# overlay-template/), never in the instance's checkout of solid-css-overlay,
-# which is not edited. The checkout's .env loads it:
-#   COMPOSE_FILE=compose.yml:/srv/<instance>-overlay/compose.override.yml
-#   OVERLAY_DIR=/srv/<instance>-overlay/overlay
-# Paths go through ${OVERLAY_DIR}: Compose resolves relative paths from the
+# The pods' look and words, mounted over the image's copies: the `pods/` folder
+# of the vertical's design-system repo (solid-kit ADR 011; Maps of Making:
+# mapsofmaking/design-system, checked out at /srv/mom-design-system). Copied
+# from solid-css-overlay's overlay-template/. Never in the instance's checkout
+# of solid-css-overlay, which is not edited. The checkout's .env loads it:
+#   COMPOSE_FILE=compose.yml:/srv/<vertical>-design-system/pods/compose.override.yml
+#   DESIGN_SYSTEM=/srv/<vertical>-design-system
+# Paths go through ${DESIGN_SYSTEM}: Compose resolves relative paths from the
 # checkout's folder, not from this file's.
 #
-# A line stays commented until its file exists in overlay/: Compose mounts a
-# missing path as an empty DIRECTORY, which then hides the image's file (a
-# skin.css that is a folder means no skin at all). To turn one on, uncomment
-# it and drop the `[]` below the list (it only keeps an all-commented list
-# valid). That is a commit here, then `git pull` on the VPS and `docker
+# A line stays commented until its file exists: Compose mounts a missing path
+# as an empty DIRECTORY, which then hides the image's file (a skin.css that is
+# a folder means no skin at all). To turn one on, uncomment it and drop the
+# `[]` below the list (it only keeps an all-commented list valid). That is a
+# commit in the design-system repo, then `git pull` on the VPS and `docker
 # compose up -d` in the checkout.
 services:
   css:
     # environment:
       # An instance that already has pods as folders (solid-css-overlay
-      # README: subdomains and folders are never interchangeable).
+      # README: subdomains and folders are never interchangeable). The pages
+      # and provider.json follow by themselves.
       # - CSS_CONFIG=/config/suffix.json
     volumes:
-      # - ${OVERLAY_DIR:?set OVERLAY_DIR in .env}/skin.css:/community-server/templates/styles/skin.css:ro
-      # - ${OVERLAY_DIR:?set OVERLAY_DIR in .env}/fonts:/community-server/templates/fonts/skin:ro
-      # Written into the data on first start only (README, "The welcome page").
-      # - ${OVERLAY_DIR:?set OVERLAY_DIR in .env}/welcome/index.html:/community-server/templates/root/intro/base/index.html:ro
+      # The vertical's kit skin, shared with every horizontal image (the
+      # backoffice reads the same file): skins/kit/, not pods/.
+      # - ${DESIGN_SYSTEM:?set DESIGN_SYSTEM in .env}/skins/kit/skin.css:/community-server/templates/styles/skin.css:ro
+      # - ${DESIGN_SYSTEM:?set DESIGN_SYSTEM in .env}/skins/kit/fonts:/community-server/templates/fonts/skin:ro
+      # The pods' own words, in this folder. Written into the data on first
+      # start only (README, "The welcome page").
+      # - ${DESIGN_SYSTEM:?set DESIGN_SYSTEM in .env}/pods/welcome/index.html:/community-server/templates/root/intro/base/index.html:ro
       # More reserved pod names than the image's: a copy of config/instance.json.
-      # - ${OVERLAY_DIR:?set OVERLAY_DIR in .env}/instance.json:/config/instance.json:ro
+      # - ${DESIGN_SYSTEM:?set DESIGN_SYSTEM in .env}/pods/instance.json:/config/instance.json:ro
       []

@@ -50,14 +50,14 @@ jobs:
         run: npm ci && npx playwright install --with-deps chromium
 
       - name: smoke, subdomain pods (the image's default)
-        env: { POD_LAYOUT: subdomain }
+        env: { POD_LAYOUT: subdomain, TRY_NETWORK: host }
         run: |
           test/try-local.sh 3123
           node test/smoke.mjs http://localhost:3123 test/shots/subdomain
           docker rm -f try-css-overlay-3123
 
       - name: smoke, folder pods (config/suffix.json)
-        env: { POD_LAYOUT: suffix }
+        env: { POD_LAYOUT: suffix, TRY_NETWORK: host }
         run: |
           test/try-local.sh 3124
           node test/smoke.mjs http://localhost:3124 test/shots/suffix
@@ -92,7 +92,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: solid-css-overlay
         run: |
-          docker build -t ghcr.io/nicolasdb/solid-css-overlay:$VERSION .
+          docker build --build-arg OVERLAY_VERSION=$VERSION -t ghcr.io/nicolasdb/solid-css-overlay:$VERSION .
           docker push ghcr.io/nicolasdb/solid-css-overlay:$VERSION
       - name: solid-mcp-connector
         run: |

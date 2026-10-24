@@ -64,6 +64,13 @@
           "@type": "StaticAssetEntry",
           "relativeUrl": "/doc-view.css",
           "filePath": "@css:templates/doc-view/doc-view.css"
+        },
+        {
+          "comment": "What this instance offers (solid-kit ADR 010), written at start by start/describe.js. Under /.well-known/css/, which already answers on every pod.",
+          "@id": "urn:solid-server:overlay:ProviderDescriptorAsset",
+          "@type": "StaticAssetEntry",
+          "relativeUrl": "/.well-known/css/provider.json",
+          "filePath": "@css:templates/provider.json"
         }
       ]
     }

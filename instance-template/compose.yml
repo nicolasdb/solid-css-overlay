@@ -25,13 +25,19 @@ services:
       # its host: https://pod.example.org/ gives https://<name>.pod.example.org/.
       # It is every WebID's and every link's prefix: choose it once.
       - CSS_BASE_URL=${CSS_BASE_URL:?set CSS_BASE_URL in .env}
+      # What /.well-known/css/provider.json says this instance offers (solid-kit
+      # ADR 010): the connector and /onboard/ are listed only when its profile
+      # is on, with its public URL. Read at start by the image (start/describe.js).
+      - COMPOSE_PROFILES=${COMPOSE_PROFILES:-}
+      - MCP_PUBLIC_BASE=${MCP_PUBLIC_BASE:-}
     volumes:
       - css-data:/data
       # The instance's own look and words (skin, fonts, welcome page, more
       # reserved names, folder pods) are NOT mounted here: this file is in
-      # the checkout, which is never edited. They live in the instance's
-      # overlay repo with the compose.override.yml that mounts them
-      # (overlay-template/), and .env points Compose at it (COMPOSE_FILE).
+      # the checkout, which is never edited. They live in the vertical's
+      # design-system repo (solid-kit ADR 011), whose pods/ folder holds the
+      # compose.override.yml that mounts them (overlay-template/), and .env
+      # points Compose at it (COMPOSE_FILE).
     healthcheck:
       test: ["CMD-SHELL", "node -e \"require('net').createConnection(3000,'localhost').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))\""]
       interval: 10s

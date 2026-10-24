@@ -54,7 +54,7 @@ applied to one VPS, step by step.
    own look lives in another repo (step 8). One checkout per function, named
    after the instance (Maps of Making: `mom-pods`, `/srv/mom-pods`).
    ```sh
-   git clone --branch v7.2.0-5 https://github.com/nicolasdb/solid-css-overlay /srv/<instance>
+   git clone --branch v7.2.0-6 https://github.com/nicolasdb/solid-css-overlay /srv/<instance>
    cd /srv/<instance>/instance-template
    cp .env.example .env                       # every value; the comments say what
    mkdir -p mcp-connector && echo '{}' > mcp-connector/identities.json && touch mcp-connector/.env
@@ -73,30 +73,73 @@ applied to one VPS, step by step.
    - `scripts/check-overrides.sh '' https://pod.<domain>` is OK.
 7. **The connector** (skip without agents: it runs only when `.env` says
    `COMPOSE_PROFILES=connector`, so a plain `docker compose up -d` starts CSS
-   alone). It boots with no identities, serving `/onboard/` only. An agent
-   is an account of its own on this server, with a pod. Its owner makes
-   client credentials on the account page (`/.account/`), then on the VPS:
-   ```sh
-   docker compose run --rm --no-deps mcp-connector node scripts/gen-slug.js   # the agent's slug
-   ```
-   and one entry in `mcp-connector/identities.json` (`identities.example.json`
-   in the connector shows the fields). Then `COMPOSE_PROFILES=connector` in
-   `.env` and `docker compose up -d`; its URL is `https://mcp.pod.<domain>/mcp/<slug>`. The slug
-   is a bearer credential: whoever has the URL acts as the agent.
+   alone, and `provider.json` then does not offer it). It boots with no
+   identities, serving `/onboard/` only.
+
+   **An agent is a WebID in its owner's pod, linked to its owner's account**
+   (solid-kit ADR 010, point 7). The owner is a person or a collective (a
+   collective has its own account and pod); the agent has no account or pod
+   of its own, and works where it was granted access. CSS makes client
+   credentials only for a WebID linked to the account asking, and the
+   connector's mint gate checks the same link, so revoking is one place.
+   The backoffice does all of this from one button. By hand, as the owner:
+   1. In the owner's pod, write the agent's profile document,
+      `profile/<name>` (Turtle, readable by everyone), with
+      `<#me> a foaf:Agent; solid:oidcIssuer <https://pod.<domain>/>.`
+   2. On the account page (`/.account/`), **link** `…/profile/<name>#me`: it
+      links at once, being in a pod of this account.
+   3. Still there, make **client credentials** for that WebID; copy the
+      secret, shown once.
+   4. On the VPS, the agent's slug and its entry in
+      `mcp-connector/identities.json` (`identities.example.json` in the
+      connector shows the fields):
+      ```sh
+      docker compose run --rm --no-deps mcp-connector node scripts/gen-slug.js
+      ```
+   Then `COMPOSE_PROFILES=connector` in `.env` and `docker compose up -d`;
+   its URL is `https://mcp.pod.<domain>/mcp/<slug>`. The slug is a bearer
+   credential: whoever has the URL acts as the agent.
 
 8. **The instance's own look** (optional; without it, the generic pages and
-   the "pod" skin): its skin, fonts, welcome page and extra reserved names, in
-   **a repo of the instance's own**, started from `overlay-template/`. Its
-   `compose.override.yml` mounts them; the checkout's `.env` loads it:
+   the "pod" skin): it comes from **its vertical's design-system repo**
+   (solid-kit ADR 011): the kit skin in `skins/kit/`, shared with the
+   backoffice, and the pods' own words in a folder `pods/`, started from
+   `overlay-template/`. That folder's `compose.override.yml` mounts them; the
+   checkout's `.env` loads it:
    ```sh
-   git clone <the overlay repo> /srv/<instance>-overlay
+   git clone <the design-system repo> /srv/<vertical>-design-system
    # in /srv/<instance>/instance-template/.env:
-   COMPOSE_FILE=compose.yml:/srv/<instance>-overlay/compose.override.yml
-   OVERLAY_DIR=/srv/<instance>-overlay/overlay
+   COMPOSE_FILE=compose.yml:/srv/<vertical>-design-system/pods/compose.override.yml
+   DESIGN_SYSTEM=/srv/<vertical>-design-system
    ```
-   then `docker compose up -d`. Nothing is built; a change is a commit there,
-   `git pull`, `docker compose up -d`. `overlay-template/README.md` has the
-   details.
+   then `docker compose up -d`. Nothing is built; a change of look is a commit
+   there, `git pull`, `docker compose up -d`. `overlay-template/README.md` has
+   the details.
+
+### What this instance offers: `/.well-known/css/provider.json`
+
+Written by the image at every start (`start/describe.js`), from its version
+and the instance's environment, and served on the server's host (solid-kit
+ADR 010). Apps read the WebID's `solid:oidcIssuer`, fetch this, and offer what
+it lists; stock CSS has no such file, which means "nothing beyond Solid".
+
+```json
+{ "software": "solid-css-overlay", "version": "7.2.0-6", "layout": "subdomain",
+  "capabilities": { "account": { "path": "/.account/" },
+                    "onboard": { "path": "/onboard/" },
+                    "connector": { "url": "https://mcp.pod.example.org/" } } }
+```
+
+- `layout`: `suffix` when `CSS_CONFIG` is `config/suffix.json`, else
+  `subdomain`. The same start writes `scripts/pod-layout.js` for the pages,
+  which a suffix instance no longer mounts.
+- `onboard` and `connector` are listed only with the connector profile on
+  (`COMPOSE_PROFILES=connector`), the connector's URL from `MCP_PUBLIC_BASE`.
+  A capability not listed is not offered.
+- **A public contract**: fields are only ever added, never renamed or removed.
+  It grants nothing: the connector keeps `ONBOARD_CORS_ORIGINS`.
+  `scripts/check-overrides.sh` checks it is served and agrees with
+  `pod-layout.js`.
 
 ### Wildcard certificate (DNS-01)
 
@@ -159,12 +202,12 @@ same shape.
 
 It is the root container's `index.html`, written from the image **on first
 start only**. On an instance that already has data, a new welcome page (a new
-image version, or a new `welcome/index.html` in the overlay repo) is copied
-in by hand, from the instance's folder:
+image version, or a new `pods/welcome/index.html` in the design-system repo)
+is copied in by hand, from the instance's folder:
 
 ```sh
-docker compose cp "$OVERLAY_DIR/welcome/index.html" css:/data/www/index.html   # subdomain pods
-docker compose cp "$OVERLAY_DIR/welcome/index.html" css:/data/index.html       # config/suffix.json
+docker compose cp "$DESIGN_SYSTEM/pods/welcome/index.html" css:/data/www/index.html   # subdomain pods
+docker compose cp "$DESIGN_SYSTEM/pods/welcome/index.html" css:/data/index.html       # config/suffix.json
 ```
 
 Without a welcome page of its own, the instance copies the image's generic one
@@ -183,9 +226,9 @@ same version as `CSS_OVERLAY_VERSION` in `instance-template/.env`, then
 `docker compose pull && docker compose up -d`. `git diff v<old> v<new> --
 instance-template/` shows what changed in the compose and the gateway
 templates (a gateway template is copied, so it is updated by hand), and
-`git diff v<old> v<new> -- overlay-template/` what changed for the overlay
-repo. A new stock CSS gives `7.x.y-1`; a new overlay on the same stock, `-n+1`
-(`CHANGELOG.md`). An overlay repo that mounts its own copy of a generic file
+`git diff v<old> v<new> -- overlay-template/` what changed for the
+design-system repo's `pods/` folder. A new stock CSS gives `7.x.y-1`; a new overlay on the same stock, `-n+1`
+(`CHANGELOG.md`). A design-system repo that mounts its own copy of a generic file
 diffs it against the new version first.
 
 ## Accounts and pods: what CSS does and does not do
@@ -249,7 +292,8 @@ The skin audit (contrast, complete slot set) lives in solid-kit:
 | `upstream-baseline.sha256`, `scripts/check-overrides.sh` | the stock templates `overlay/` replaces, hashed |
 | `test/` | `try-local.sh` (runs the image) + `smoke.mjs` (a real browser, both layouts) |
 | `instance-template/` | what an instance runs from (its checkout): compose, `.env.example`, the Caddy and nginx gateway templates |
-| `overlay-template/` | what an instance's overlay repo starts from: `compose.override.yml`, `overlay/` |
+| `overlay-template/` | what the `pods/` folder of a vertical's design-system repo starts from (ADR 011) |
+| `start/` | the image's entrypoint: writes `provider.json` and `pod-layout.js`, then runs stock CSS |
 | `gateway-caddy/` | Caddy + the OVH DNS module, for the wildcard certificate |
 | `docs/` | install briefs for one VPS (`handoff-mapsofmaking.md`) |
 | `ROADMAP.md` | planned features: account deletion, the right to erasure |

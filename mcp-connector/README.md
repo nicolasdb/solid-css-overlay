@@ -16,11 +16,19 @@ cp .env.example .env
 # then fill in SOLID_OIDC_ISSUER / SOLID_CLIENT_ID / SOLID_CLIENT_SECRET
 ```
 
-Getting the client id/secret (Community Solid Server):
-1. Create a dedicated account for the agent (its own WebID, not a human's).
-2. Go to `<your-css-instance>/.account/`, log in, open **Client credentials**.
-3. Name the token, pick the agent's WebID, generate. Copy the `secret` now —
-   the server won't show it again.
+Getting the client id/secret (Community Solid Server). An agent is a WebID
+in its owner's pod, linked to its owner's account, never an account of its
+own (solid-kit ADR 010, point 7: CSS makes client credentials only for a WebID
+linked to the account asking, and `/onboard/mint` checks the same link). Until
+2026-10 this said "create a dedicated account for the agent", which needed a
+password nobody uses and put revocation in a second place.
+1. In the owner's pod (a person's or a collective's), write the agent's
+   profile, `profile/<name>`, readable by everyone, with
+   `<#me> a foaf:Agent; solid:oidcIssuer <https://<server>/>.`
+2. On `<your-css-instance>/.account/`, logged in as the owner, **link**
+   `…/profile/<name>#me` (it links at once: it is in a pod of this account).
+3. Open **Client credentials**, name the token, pick that WebID, generate.
+   Copy the `secret` now — the server won't show it again.
 
 Then have the Pod owner (Nicolas, or a Singelijn student) grant that WebID
 scoped WAC access on the containers the agent should touch.
