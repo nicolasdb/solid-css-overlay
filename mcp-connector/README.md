@@ -154,8 +154,8 @@ to start and names the failing identity's *label* (never its slug or secret)
 in the error.
 
 **Adding a person (primary route, Story 7.9):** they sign in to the backoffice
-themselves, open **People & apps → Claude connector access**, and click
-**"Get connector URL for Claude."** No config edit, no restart, no operator —
+themselves, open **You → Your agents**, and on an agent click **Connect to
+AI**, then **Make the connector URL** (solid-backoffice 0.2+). No config edit, no restart, no operator —
 the backoffice's `/onboard/mint` endpoint (mounted here, proxied in via
 `pod.nicolasdb.eu/onboard/`, `hetzner-gateway` repo) mints the CSS credential,
 generates the slug, and writes `identities.json` itself, atomically and
@@ -172,7 +172,7 @@ account (mint gate), and its profile document must be **publicly
 dereferenceable** (the resource server fetches it anonymously for
 `solid:oidcIssuer` — a private document fails authentication with an opaque
 error at token-use time, not at mint time). The backoffice's **Agent
-identities** flow (People & apps) guarantees both when it creates an
+identities** flow (You → Your agents → New agent) guarantees both when it creates an
 identity; a hand-made WebID document does not unless you check both
 yourself.
 

@@ -979,7 +979,7 @@ async function bootIdentities() {
     // eslint-disable-next-line no-console
     console.warn(
       "[solid-pod-agent mcp-server] no active identities configured — serving /onboard/ only. " +
-        "Mint one from the backoffice (People & apps -> Claude connector access)."
+        "Mint one from the backoffice (You -> Your agents -> Connect to AI)."
     );
   }
 

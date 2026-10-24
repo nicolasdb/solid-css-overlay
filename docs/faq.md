@@ -35,6 +35,13 @@ It does not skip anything. CSS has no "don't ask again": every interactive
 sign-in shows the choice of WebID and the consent page. Until 7.2.0-7 the
 label said "Remember this app, so it doesn't ask again", which promised that.
 
+## An agent is connected and used, but its card says "never used yet"
+
+The connector writes "last used" in batches, at most once every 5 minutes
+per agent (`LAST_USED_FLUSH_MS` in `mcp-connector/src/mcp-server.js`), so a
+write to `identities.json` is not made on every request. Reload after a few
+minutes.
+
 ## After a reload, an app lands on its home screen. Is that CSS?
 
 Not CSS: the app. The silent round trip comes back to the app's redirect URL,
