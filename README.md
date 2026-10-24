@@ -233,7 +233,8 @@ diffs it against the new version first.
 
 ## Accounts and pods: what CSS does and does not do
 
-Checked against the CSS 7.2.0 source, 2026-10-21.
+Checked against the CSS 7.2.0 source, 2026-10-21. How long sign-ins last,
+and why people are asked again: [`docs/faq.md`](docs/faq.md).
 
 **An account with no login is removed after 30 minutes.** Signing up makes
 the account first and the email/password second. If nobody adds a login
@@ -295,7 +296,7 @@ The skin audit (contrast, complete slot set) lives in solid-kit:
 | `overlay-template/` | what the `pods/` folder of a vertical's design-system repo starts from (ADR 011) |
 | `start/` | the image's entrypoint: writes `provider.json` and `pod-layout.js`, then runs stock CSS |
 | `gateway-caddy/` | Caddy + the OVH DNS module, for the wildcard certificate |
-| `docs/` | install briefs for one VPS (`handoff-mapsofmaking.md`) |
+| `docs/` | `faq.md` (sign-in lifetimes, consent), install briefs for one VPS (`handoff-mapsofmaking.md`) |
 | `ROADMAP.md` | planned features: account deletion, the right to erasure |
 | `mcp-connector/` | the connector's source and image |
 | `skills/css-instance/` | the method, for Claude Code; never required |

@@ -4,6 +4,16 @@ Versions are `<stock CSS version>-<n>`: a new stock release starts at `-1`, a
 new overlay on the same stock adds one. A tag `v<version>` publishes both
 images (`.github/workflows/build.yml`).
 
+## Unreleased
+
+- **Consent says what its checkbox does**: "Let this app stay signed in",
+  not "Remember this app, so it doesn't ask again". The box only decides
+  whether the app gets a refresh token (`offline_access`, 24 h in stock
+  CSS); CSS has no way to skip consent, so the old words promised what
+  never happened.
+- **`docs/faq.md`**: how long each sign-in lasts in stock CSS, and why
+  people are asked to sign in or consent again.
+
 ## 7.2.0-6 — 2026-10-24
 
 The overlay's side of solid-kit ADR 010 (a provider says what it offers) and
