@@ -4,7 +4,9 @@ Versions are `<stock CSS version>-<n>`: a new stock release starts at `-1`, a
 new overlay on the same stock adds one. A tag `v<version>` publishes both
 images (`.github/workflows/build.yml`).
 
-## Unreleased
+## 7.2.0-7 — 2026-10-24
+
+Words, no behaviour change. An instance updates the image and nothing else.
 
 - **Consent says what its checkbox does**: "Let this app stay signed in",
   not "Remember this app, so it doesn't ask again". The box only decides
@@ -12,7 +14,11 @@ images (`.github/workflows/build.yml`).
   CSS); CSS has no way to skip consent, so the old words promised what
   never happened.
 - **`docs/faq.md`**: how long each sign-in lasts in stock CSS, and why
-  people are asked to sign in or consent again.
+  people are asked to sign in or consent again, and why an agent's "last
+  used" lags by up to 5 minutes.
+- **The connector names today's backoffice**: its start log and README
+  say "You → Your agents → Connect to AI", not the old backoffice's
+  "People & apps".
 
 ## 7.2.0-6 — 2026-10-24
 
