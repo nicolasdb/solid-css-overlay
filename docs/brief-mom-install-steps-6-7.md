@@ -30,7 +30,7 @@ first: solid-kit `docs/adr/010-providers-say-what-they-offer.md` (branch
    shows `https://open_fab.pod.mapsofmaking.org/` while the error says the
    name is invalid. Cosmetic.
 
-## Design, after ADR 010 is accepted
+## Design (ADR 010, accepted)
 
 5. **Serve `/.well-known/css/provider.json`**: overlay version, layout, and
    the capabilities with their paths (`account`, `onboard`, `connector` with
@@ -38,16 +38,24 @@ first: solid-kit `docs/adr/010-providers-say-what-they-offer.md` (branch
    added. `check-overrides.sh` checks it is served. Generated at start from
    env (the connector URL is per instance) or a template in the image: your
    call, the checkout stays unedited.
-6. **One model of an agent.** README step 7 and the handoff say "the agent's
-   own account and pod"; the backoffice makes a WebID in the owner's pod
-   (`profile/<name>#me`) linked to the owner's account, which is what the
-   mint gate (Story 7.12) checks. Align the docs on the backoffice's model,
-   or say why both exist.
-7. **Consent shows the app's origin.** Today `consent.html.ejs:81-82` shows
-   `client_name` (chosen by the app) and `client_id` (random). Check whether
-   CSS 7.2's consent response carries `redirect_uris`; if so, show their host
-   above the name, as the thing to check. The header's provider host is small
-   mono text; make it readable. Context: every instance's pages look alike in
-   the generic skin, so a copy on another domain is easy to miss.
+6. **One model of an agent** (ADR 010, point 7): a WebID in its owner's pod
+   (`profile/<name>#me`), linked to its owner's account, the owner a person
+   or a collective; no account or pod of its own. README step 7 and the
+   handoff's step 7 change to it (the backoffice makes it; by hand, it is the
+   owner's account that links the WebID and makes the client credentials).
+7. **Consent names the app's origin** (ADR 010, point 6). CSS 7.2's
+   `ClientInfoHandler` sends no redirect URIs (checked on the 7.2.0-5 image),
+   so: when `client_id` is an `https:` URL (a Client ID Document, which CSS
+   fetches and redirects only to its `redirect_uris`), show its host large,
+   as the thing to check, above `client_name`; otherwise say the app did not
+   say where it is served from, and show `client_name` as a claim. The
+   header's provider host in a readable size. No CSS component.
 8. **Handoff**: `ONBOARD_CORS_ORIGINS=https://backoffice.mapsofmaking.org`
    once that deploy exists; step 7 waits for it and for 1.
+9. **An instance's look comes from its vertical's design-system repo**
+   (ADR 011). Maps of Making's is `mapsofmaking/design-system` (it was the
+   empty `mom-pods-overlay`), folder `pods/`, checked out at
+   `/srv/mom-design-system`. `overlay-template/README.md`, README step 8 and
+   the handoff (lines naming `mom-pods-overlay`) describe a folder of that
+   repo (`COMPOSE_FILE=compose.yml:/srv/<vertical>-design-system/pods/compose.override.yml`),
+   with `skin.css` from its `skins/kit/`, shared with the backoffice.
