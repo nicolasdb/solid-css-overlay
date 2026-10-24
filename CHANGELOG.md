@@ -11,6 +11,8 @@ images (`.github/workflows/build.yml`).
   whether the app gets a refresh token (`offline_access`, 24 h in stock
   CSS); CSS has no way to skip consent, so the old words promised what
   never happened.
+- **`docs/faq.md`**: how long each sign-in lasts in stock CSS, and why
+  people are asked to sign in or consent again.
 
 ## 7.2.0-6 — 2026-10-24
 
