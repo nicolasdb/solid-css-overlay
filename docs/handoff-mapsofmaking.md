@@ -14,7 +14,7 @@ particular to Maps of Making.
 | Connector (`MCP_PUBLIC_BASE`) | `https://mcp.pod.mapsofmaking.org/` |
 | `MCP_ALLOWED_HOSTS` | `mcp.pod.mapsofmaking.org,pod.mapsofmaking.org` (the second is for `/onboard/`) |
 | `INSTANCE_NAME` | `mom-pods`: containers `mom-pods-css` and `mom-pods-mcp-connector`, volume `mom-pods_css-data`. One checkout per function, prefix `mom-` |
-| `CSS_OVERLAY_VERSION` | `7.2.0-5`, the same as the tag checked out |
+| `CSS_OVERLAY_VERSION` | `7.2.0-6`, the same as the tag checked out |
 | `GATEWAY_NETWORK` | `proxy` |
 | DNS | OVH, zone `mapsofmaking.org`. The site on `mapsofmaking.org` lives on another server (Hetzner) and is not touched |
 | VPS | Debian 13, Docker 29.7.2, Compose v5.5.0; 3.7 GiB RAM, no swap; IPv4 `92.222.71.103`, IPv6 `2001:41d0:404:200::94de` |
@@ -31,12 +31,17 @@ particular to Maps of Making.
 - **The instance's compose stays in its own repo**, solid-css-overlay, as
   vps-infra's README requires: the instance is a checkout of it at
   `/srv/mom-pods`, never edited.
-- **Maps of Making's own look** (skin, fonts, welcome page, more reserved
-  names) lives in the repo `mapsofmaking/mom-pods-overlay`, checked out at
-  `/srv/mom-pods-overlay`. Nicolas creates it from solid-css-overlay's
-  `overlay-template/`. It is optional at first: without it, the generic look.
-  The checkout's `.env` loads it (README "Install from scratch", step 8).
-- One checkout per function, prefix `mom-`.
+- **Maps of Making's own look** comes from its design-system repo,
+  `mapsofmaking/design-system` (it was the empty `mom-pods-overlay`; solid-kit
+  ADR 011), checked out at `/srv/mom-design-system`: the kit skin in
+  `skins/kit/` (shared with the backoffice), the pods' words in `pods/`,
+  started from solid-css-overlay's `overlay-template/`. Optional at first:
+  without it, the generic look. The checkout's `.env` loads it (README
+  "Install from scratch", step 8):
+  `COMPOSE_FILE=compose.yml:/srv/mom-design-system/pods/compose.override.yml`
+  and `DESIGN_SYSTEM=/srv/mom-design-system`.
+- One checkout per function, prefix `mom-`: `/srv/mom-pods`,
+  `/srv/mom-backoffice` (once deployed), `/srv/mom-design-system`.
 
 ## Rules for this session
 
@@ -134,13 +139,14 @@ particular to Maps of Making.
    backoffice deploy at `backoffice.mapsofmaking.org`, whose page mints
    agents through `/onboard/`. Then `.env` gets
    `ONBOARD_CORS_ORIGINS=https://backoffice.mapsofmaking.org` and
-   `COMPOSE_PROFILES=connector`. How an agent is modelled (its own account,
-   or a WebID in its owner's pod as the backoffice makes it) waits for
-   solid-kit ADR 010. Until then, by hand, Nicolas:
-   - creates the agent's account and pod;
-   - makes client credentials for the agent on `/.account/`;
-   - writes the `identities.json` entry and the agent's values into
-     `instance-template/mcp-connector/` on the VPS.
+   `COMPOSE_PROFILES=connector`. An agent is a WebID in its owner's pod,
+   linked to its owner's account (ADR 010, point 7): no account or pod of its
+   own. The backoffice makes it; by hand, README step 7: Nicolas, in his own
+   account (or a collective's), writes `profile/<name>`, links
+   `…/profile/<name>#me`, makes its client credentials, and writes the
+   `identities.json` entry on the VPS.
+   With the profile on, `https://pod.mapsofmaking.org/.well-known/css/provider.json`
+   lists `onboard` and `connector`; without it, `account` only.
 
    Then `docker compose up -d` (with the profile on), and check
    `curl -s https://mcp.pod.mapsofmaking.org/healthz`. Make one `solid_whoami`
@@ -180,6 +186,16 @@ no longer starts a connector that crash-loops on an empty `identities.json`
 (fixed too). Keep `MCP_PUBLIC_BASE` and `MCP_ALLOWED_HOSTS` set in `.env`:
 Compose checks them even with the profile off.
 
+## Updating to 7.2.0-6 (provider.json, the consent page)
+
+The same steps with `v7.2.0-6`. Then:
+- `https://pod.mapsofmaking.org/.well-known/css/provider.json` answers, and
+  `scripts/check-overrides.sh '' https://pod.mapsofmaking.org` checks it.
+- The consent page names where an app runs when it signs in with a Client ID
+  Document, and says so plainly when it does not.
+- `.env`: `OVERLAY_DIR` is now `DESIGN_SYSTEM` (only if the look was already
+  mounted).
+
 ## Between test rounds
 
 The reset in the README ("Accounts and pods"), in
@@ -193,7 +209,7 @@ only while the instance holds test accounts only.
 
 - **Backups of the `mom-pods_css-data` volume**: it holds every account
   and pod. This install does not set them up.
-- Maps of Making's own skin and words: the `mom-pods-overlay` repo
+- Maps of Making's own skin and words: `mapsofmaking/design-system`
   (above), then README step 8.
 - vps-infra housekeeping: the old `/srv/gateway` and `/srv/portainer` copies
   are still on the VPS.

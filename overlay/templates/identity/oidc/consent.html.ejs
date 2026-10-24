@@ -3,13 +3,15 @@
     Changed: copy; focus starts on the heading (#authorize is disabled at load and
     cannot take autofocus); the WebID list is sorted, labelled for reading and
     pre-selects the WebID last authorized in this browser; client name and ID are
-    inserted as text, not markup (stock inserts the app's own metadata as HTML). -%>
+    inserted as text, not markup (stock inserts the app's own metadata as HTML).
+    Added: #client-origin, where the app runs (solid-kit ADR 010, point 6). -%>
 <h1 tabindex="-1" autofocus>An app wants to use your pod</h1>
 <p class="error" id="error"></p>
 <p class="intro">
   If you authorize it, this app can read and change the data in your pod,
   acting as the WebID you choose below. Only authorize apps you recognise.
 </p>
+<div id="client-origin" class="client-origin"></div>
 <div style="display: flex;">
   <img id="client_logo" width="40" height="40" style="margin-top: 1em; padding-left: 2em; visibility: collapse;">
   <dl id="client" style="text-wrap: nowrap;"></dl>
@@ -78,8 +80,10 @@
     }
 
     const { client } = await fetchJson(controls.oidc.consent);
-    showClientInfo('Name', client.client_name);
-    showClientInfo('ID', client.client_id);
+    const origin = clientOrigin(client.client_id);
+    showClientOrigin(origin);
+    showClientInfo(origin ? 'Calls itself' : 'Calls itself (unchecked)', client.client_name);
+    showClientInfo('Client ID', client.client_id);
     showClientLogo(client.logo_uri, `[${client.client_name} Logo]`);
 
     addPostListener(() => consent(controls));
@@ -185,6 +189,39 @@
       dd.textContent = value;
       elements.client.append(dt, dd);
     }
+  }
+
+  // Where the app runs, when this server can vouch for it (solid-kit ADR 010,
+  // point 6). CSS 7.2 sends the client's own metadata and no redirect URIs, so
+  // a name or a logo proves nothing: any page can call itself "Pod Backoffice".
+  // A client_id that is a URL is a Client ID Document: CSS fetched it and
+  // sends the sign-in only to the redirect URIs it lists, on that origin, so
+  // its host is the one thing worth checking. Any other client_id was handed
+  // out on registration to whoever asked. http: counts only on an http: server
+  // (a local test); a real instance is https and wants https.
+  function clientOrigin(clientId) {
+    let url;
+    try { url = new URL(clientId); } catch { return null; }
+    if (url.protocol === 'https:' || (url.protocol === 'http:' && location.protocol === 'http:')) return url.host;
+    return null;
+  }
+
+  function showClientOrigin(host) {
+    const box = document.getElementById('client-origin');
+    const line = document.createElement('p');
+    const hint = document.createElement('p');
+    hint.className = 'hint';
+    if (host) {
+      const where = document.createElement('strong');
+      where.textContent = host;
+      line.append('This app runs at ', where);
+      hint.textContent = 'Check this address: your sign-in can only go back there. The name below is the one the app gives itself.';
+    } else {
+      box.classList.add('unknown');
+      line.textContent = 'This app did not say where it runs.';
+      hint.textContent = 'The name below is what it calls itself; this server could not check it. Authorize it only if you started this sign-in yourself, from an app you trust.';
+    }
+    box.replaceChildren(line, hint);
   }
 
   // Attach client logo to placeholder img

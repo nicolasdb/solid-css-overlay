@@ -9,6 +9,8 @@
 # POD_LAYOUT subdomain (default: config/instance.json) or suffix
 #            (config/suffix.json, what pocpod0 runs). smoke.mjs reads the same
 #            variable, so export it once for both.
+# COMPOSE_PROFILES, MCP_PUBLIC_BASE  passed through when set, as compose does:
+#            they decide what /.well-known/css/provider.json offers.
 # TRY_NETWORK=host  share the host's network instead of publishing the port
 #            (Linux; for a sandbox where published ports do not answer).
 #
@@ -37,16 +39,17 @@ rm -rf "$work" && mkdir -p "$work/data"
 chmod 777 "$work/data"
 args=(--rm -d --name "$name" -v "$work/data:/data"
   -e "CSS_BASE_URL=http://localhost:$port/" -e "CSS_PORT=$port")
+[ -n "${COMPOSE_PROFILES:-}" ] && args+=(-e "COMPOSE_PROFILES=$COMPOSE_PROFILES")
+[ -n "${MCP_PUBLIC_BASE:-}" ] && args+=(-e "MCP_PUBLIC_BASE=$MCP_PUBLIC_BASE")
 if [ "${TRY_NETWORK:-}" = host ]; then args+=(--network host); else args+=(-p "$port:$port"); fi
 
 case "$layout" in
   subdomain) ;;
   suffix)
-    # The config, and the pages told so (overlay/pod-layout.js), as an
-    # instance on suffix.json must do.
-    echo 'window.podLayout = "suffix";' > "$work/pod-layout.js"
-    args+=(-e CSS_CONFIG=/config/suffix.json
-      -v "$work/pod-layout.js:/community-server/templates/scripts/pod-layout.js:ro") ;;
+    # The config only: since 7.2.0-6 the image tells the pages itself
+    # (start/describe.js writes pod-layout.js from CSS_CONFIG). Until then this
+    # script mounted a pod-layout.js, as every suffix instance had to.
+    args+=(-e CSS_CONFIG=/config/suffix.json) ;;
   *) echo "POD_LAYOUT must be subdomain or suffix, not $layout" >&2; exit 2 ;;
 esac
 

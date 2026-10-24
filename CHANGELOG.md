@@ -4,6 +4,34 @@ Versions are `<stock CSS version>-<n>`: a new stock release starts at `-1`, a
 new overlay on the same stock adds one. A tag `v<version>` publishes both
 images (`.github/workflows/build.yml`).
 
+## 7.2.0-6 — 2026-10-24
+
+The overlay's side of solid-kit ADR 010 (a provider says what it offers) and
+ADR 011 (an instance's look comes from its vertical's design-system repo):
+items 5, 6, 7 and 9 of the Maps of Making install brief.
+
+- **`/.well-known/css/provider.json`**: what this instance offers, written at
+  every start by the new entrypoint (`start/describe.js`, then stock CSS):
+  version, pod layout, and `account`, plus `onboard` and `connector` (its
+  public URL) when the connector profile is on. A public contract, fields
+  only added; `check-overrides.sh` checks it. The publish job bakes the
+  version in.
+- **The pod layout is the image's to say**: the same start writes
+  `pod-layout.js` from `CSS_CONFIG`. A suffix instance no longer mounts its
+  own copy.
+- **The consent page names where the app runs** when it signs in with a
+  Client ID Document (its `client_id` is a URL: the server fetched it and
+  redirects only to its `redirect_uris`), large, above the name the app gives
+  itself. Otherwise it says the app did not say where it runs, and marks the
+  name unchecked. The header's server host is larger and darker. The smoke
+  run covers both cases (CI now runs it on the host network, so the server
+  can fetch the test's Client ID Document).
+- **One model of an agent**: a WebID in its owner's pod, linked to the
+  owner's account (README step 7, the handoff, the connector's README).
+- **The look comes from the design-system repo**: `overlay-template/` is the
+  `pods/` folder of a vertical's design-system repo; the kit skin is mounted
+  from its `skins/kit/`. `.env`: `DESIGN_SYSTEM` replaces `OVERLAY_DIR`.
+
 ## 7.2.0-5 — 2026-10-23
 
 The bugs from the Maps of Making install brief (steps 6 and 7). Its design

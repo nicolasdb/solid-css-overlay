@@ -13,6 +13,7 @@
 import { chromium } from "playwright";
 import { mkdirSync } from "node:fs";
 import crypto from "node:crypto";
+import http from "node:http";
 
 const base = (process.argv[2] || "http://localhost:3123").replace(/\/$/, "");
 const out = process.argv[3] || "smoke-shots";
@@ -151,12 +152,42 @@ check(rows.length >= 2, `consent: lists the account's WebIDs (${rows.length})`);
 check(rows.every((r) => r.key >= 2), "consent: every WebID shows its pod and document as key parts");
 check((await page.evaluate(() => document.activeElement?.tagName)) === "H1", "consent: focus starts on the heading");
 check(!(await page.$eval("#client", (dl) => dl.innerHTML.includes("<script"))), "consent: client info is text");
+// A dynamically registered app proves nothing about where it runs (ADR 010, point 6).
+check(/did not say where it runs/.test(await page.textContent("#client-origin")), "consent: a registered app is said not to have shown where it runs");
 const chosen = rows[rows.length - 1].value;
 await page.check(`#webIdList input[value="${chosen}"]`);
 await Promise.all([page.waitForURL(/localhost:9\//, { timeout: 15000 }).catch(() => {}), page.click("#authorize")]);
 const again = await desk.newPage();
 await toConsent(again);
 check((await again.$eval("#webIdList input:checked", (i) => i.value).catch(() => null)) === chosen, "consent: the last WebID chosen is pre-selected");
+
+// An app with a Client ID Document: the server fetched it and sends the sign-in
+// only to its redirect URIs, so the page names the document's host. Served
+// here, on the machine running the smoke run; the server must reach it, which
+// it does with TRY_NETWORK=host (try-local.sh, and CI).
+const DOC_PORT = 3199;
+const docId = `http://localhost:${DOC_PORT}/id.jsonld`;
+const docServer = http.createServer((req, res) => {
+  res.writeHead(200, { "content-type": "application/ld+json" });
+  res.end(JSON.stringify({
+    "@context": ["https://www.w3.org/ns/solid/oidc-context.jsonld"],
+    client_id: docId, client_name: "Smoke test app (document)",
+    redirect_uris: ["http://localhost:9/cb"], grant_types: ["authorization_code"],
+    response_types: ["code"], scope: "openid webid", token_endpoint_auth_method: "none",
+  }));
+}).listen(DOC_PORT);
+const docPage = await desk.newPage();
+await docPage.goto(auth.replace(`client_id=${encodeURIComponent(reg.client_id)}`, `client_id=${encodeURIComponent(docId)}`));
+const docReached = await docPage.waitForURL(/consent/, { timeout: 15000 }).then(() => true, () => false);
+if (docReached) {
+  await docPage.waitForFunction(() => document.getElementById("client-origin")?.textContent.trim());
+  const said = await docPage.textContent("#client-origin");
+  check(said.includes(`This app runs at localhost:${DOC_PORT}`), `consent: a Client ID Document's host is named (got "${said.slice(0, 60)}")`);
+  await shot(docPage, "06b-consent-client-id-document");
+} else {
+  check(false, `consent: the server could not use the Client ID Document at ${docId} (is it reachable from the server? TRY_NETWORK=host)`);
+}
+docServer.close();
 
 // Log in: a wrong password, then a server that never answers
 const fresh = await browser.newContext({ viewport: { width: 1280, height: 900 } });

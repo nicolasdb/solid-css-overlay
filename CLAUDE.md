@@ -47,8 +47,12 @@ tests, `scripts/check-overrides.sh`.
 - **The connector never derives a pod root from a URL's shape**: `src/podRoot.js`.
 - **An instance's checkout of this repo is never edited.** What it adds by
   hand is git-ignored (`.env`, `mcp-connector/`); its look and the override
-  that mounts it live in its own overlay repo (`overlay-template/`). A
-  feature that needs an instance to edit a tracked file is designed wrong.
+  that mounts it live in its vertical's design-system repo, folder `pods/`
+  (`overlay-template/`, solid-kit ADR 011). A feature that needs an instance
+  to edit a tracked file is designed wrong.
+- **`/.well-known/css/provider.json` is a public contract** (solid-kit
+  ADR 010): apps decide what to offer from it. Fields are only ever added,
+  never renamed or removed; `start/describe.js` writes it.
 - The create-pod form and `PodNameGuard` say the same thing in the same words;
   change both.
 - `overlay/doc-view/` is generated in solid-kit (`scripts/export-doc-view.sh`);

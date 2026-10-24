@@ -78,7 +78,7 @@ jobs:
         id: smoke_subdomain
         if: steps.build.outcome == 'success'
         continue-on-error: true
-        env: { POD_LAYOUT: subdomain, IMAGE: "solid-css-overlay:${{ matrix.tag }}" }
+        env: { POD_LAYOUT: subdomain, TRY_NETWORK: host, IMAGE: "solid-css-overlay:${{ matrix.tag }}" }
         run: |
           test/try-local.sh 3123
           node test/smoke.mjs http://localhost:3123 "test/shots/$TAG-subdomain"
@@ -86,7 +86,7 @@ jobs:
         id: smoke_suffix
         if: steps.build.outcome == 'success'
         continue-on-error: true
-        env: { POD_LAYOUT: suffix, IMAGE: "solid-css-overlay:${{ matrix.tag }}" }
+        env: { POD_LAYOUT: suffix, TRY_NETWORK: host, IMAGE: "solid-css-overlay:${{ matrix.tag }}" }
         run: |
           docker rm -f try-css-overlay-3123 >/dev/null 2>&1 || true
           test/try-local.sh 3124
