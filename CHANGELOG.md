@@ -4,8 +4,20 @@ Versions are `<stock CSS version>-<n>`: a new stock release starts at `-1`, a
 new overlay on the same stock adds one. A tag `v<version>` publishes both
 images (`.github/workflows/build.yml`).
 
-## Unreleased
+## 7.2.0-8 — 2026-10-25
 
+For a small shared host. An instance updates the image; `.env` may add
+`CSS_MEM_LIMIT`, nothing else to change.
+
+- **The connector waits for CSS**: `depends_on: css: service_healthy`. Started
+  beside a CSS not up yet, every identity's login got a 502 and the log
+  said "0 identities". This covers `docker compose up`; after a dockerd
+  restart or a reboot, an identity skipped at boot still logs in at its
+  first request, as before.
+- **The start log says so**: "none of the N identities logged in at boot,
+  each is retried at its first request", no longer "no active identities
+  configured", which read as broken and sent us to restart a connector
+  that was recovering anyway.
 - **CSS has a memory limit**: `mem_limit` 512m in `instance-template/compose.yml`,
   `CSS_MEM_LIMIT` in `.env` to change it. Until now only the connector had
   one, so a leak in CSS could take a small host down, other stacks included.

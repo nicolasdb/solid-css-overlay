@@ -963,7 +963,7 @@ async function bootIdentities() {
       // one person's requests cleanly and retries once the entry is fixed.
       // eslint-disable-next-line no-console
       console.error(
-        `[solid-pod-agent mcp-server] Solid login failed for identity "${id.label}" — skipped at boot, other identities unaffected:`,
+        `[solid-pod-agent mcp-server] Solid login failed for identity "${id.label}" — skipped at boot, retried at its first request; other identities unaffected:`,
         err.message
       );
       continue;
@@ -971,7 +971,16 @@ async function bootIdentities() {
     identities.set(slug, entry);
   }
 
-  if (identities.size === 0) {
+  if (identities.size === 0 && configured.size > 0) {
+    // Not the same as none configured: every login failed (CSS not up yet,
+    // MoM 2026-10-24). Saying "no active identities" sent us to restart a
+    // connector that would have recovered at the first request anyway.
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[solid-pod-agent mcp-server] none of the ${configured.size} identities logged in at boot — ` +
+        "each is retried at its first request."
+    );
+  } else if (identities.size === 0) {
     // Legitimate since Story 7.9: every identity may be revoked. Boot anyway
     // so /onboard/ stays reachable and a replacement can be minted — refusing
     // to start here would be a deadlock, since the mint endpoint is served by
