@@ -63,6 +63,14 @@ services:
     image: ghcr.io/nicolasdb/solid-mcp-connector:${CSS_OVERLAY_VERSION}
     container_name: ${INSTANCE_NAME}-mcp-connector
     restart: unless-stopped
+    # Each identity logs in to CSS at boot. Started beside a CSS that is not
+    # up yet, every login got a 502 and the start log said "0 identities"
+    # (MoM, 2026-10-24). This covers `docker compose up` only: a dockerd
+    # restart or a reboot starts containers without Compose's order, and
+    # there an identity skipped at boot logs in at its first request.
+    depends_on:
+      css:
+        condition: service_healthy
     environment:
       - PORT=3939
       - HOST=0.0.0.0

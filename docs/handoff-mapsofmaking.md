@@ -14,7 +14,7 @@ particular to Maps of Making.
 | Connector (`MCP_PUBLIC_BASE`) | `https://mcp.pod.mapsofmaking.org/` |
 | `MCP_ALLOWED_HOSTS` | `mcp.pod.mapsofmaking.org,pod.mapsofmaking.org` (the second is for `/onboard/`) |
 | `INSTANCE_NAME` | `mom-pods`: containers `mom-pods-css` and `mom-pods-mcp-connector`, volume `mom-pods_css-data`. One checkout per function, prefix `mom-` |
-| `CSS_OVERLAY_VERSION` | `7.2.0-7`, the same as the tag checked out |
+| `CSS_OVERLAY_VERSION` | `7.2.0-8`, the same as the tag checked out |
 | `GATEWAY_NETWORK` | `proxy` |
 | DNS | OVH, zone `mapsofmaking.org`. The site on `mapsofmaking.org` lives on another server (Hetzner) and is not touched |
 | VPS | Debian 13, Docker 29.7.2, Compose v5.5.0; 3.7 GiB RAM, no swap; IPv4 `92.222.71.103`, IPv6 `2001:41d0:404:200::94de` |
@@ -200,6 +200,15 @@ The same steps with `v7.2.0-6`. Then:
 
 The same steps with `v7.2.0-7`. The consent checkbox then reads "Let this
 app stay signed in". Nothing else to change.
+
+## Updating to 7.2.0-8 (memory limit, connector waits for CSS)
+
+The same steps with `v7.2.0-8`, then `docker compose up -d --force-recreate`
+so both containers are created again: they then get the daemon's log
+rotation and CSS its 512m limit. Check with
+`docker inspect -f '{{.HostConfig.LogConfig.Config}} {{.HostConfig.Memory}}' mom-pods-css`
+(`map[max-file:3 max-size:10m] 536870912`), and the connector's log names
+`mom2` ready.
 
 ## Between test rounds
 
