@@ -4,6 +4,26 @@ Versions are `<stock CSS version>-<n>`: a new stock release starts at `-1`, a
 new overlay on the same stock adds one. A tag `v<version>` publishes both
 images (`.github/workflows/build.yml`).
 
+## 7.2.0-9 — 2026-10-25
+
+An instance updates the image; `email.env` is optional. Without it nothing
+changes.
+
+- **"Forgot your password?" can send its link.** The image imported stock
+  `identity/email/default.json`, which has no sender, so the page answered
+  "No email server is configured." and nobody could reset a password
+  (Maps of Making #15). Both configs now import `identity/email/overlay.json`,
+  written at every start by `start/email.js` from `SMTP_HOST`, `SMTP_PORT`,
+  `SMTP_USER`, `SMTP_PASS` and `EMAIL_FROM`: the stock `BaseEmailSender`
+  when set, stock's "no email server" when not. They come from
+  `instance-template/email.env` (git-ignored, optional, `email.env.example`),
+  apart from `.env` because it holds a password. `SMTP_HOST` set with a value
+  missing stops the start. STARTTLS only (587): stock CSS cannot be told to
+  use port 465.
+- **The reset mail says what it is**: who asked, a "Choose a new password"
+  link, 15 minutes, and "ignore this mail" if you did not ask. Stock said
+  "Click here" and nothing else, which reads like phishing.
+
 ## 7.2.0-8 — 2026-10-25
 
 For a small shared host. An instance updates the image; `.env` may add

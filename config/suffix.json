@@ -10,7 +10,7 @@
     "css:config/http/server-factory/http.json",
     "css:config/http/static/default.json",
     "css:config/identity/access/public.json",
-    "css:config/identity/email/default.json",
+    "css:config/identity/email/overlay.json",
     "css:config/identity/handler/default.json",
     "css:config/identity/oidc/default.json",
     "css:config/identity/ownership/token.json",

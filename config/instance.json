@@ -13,7 +13,7 @@
     "css:config/http/server-factory/http.json",
     "css:config/http/static/default.json",
     "css:config/identity/access/public.json",
-    "css:config/identity/email/default.json",
+    "css:config/identity/email/overlay.json",
     "css:config/identity/handler/default.json",
     "css:config/identity/oidc/default.json",
     "css:config/identity/ownership/token.json",
@@ -38,7 +38,7 @@
   "@graph": [
     {
       "comment": [
-        "The image's default: stock css:config/file.json, with three changes. Everything else is stock.",
+        "The image's default: stock css:config/file.json, with four changes. Everything else is stock.",
         "1. Pods are subdomains (alice.example.org), not folders (example.org/alice/). Decided for every NEW",
         "   instance (2026-10-14). NEVER switch an instance that already has folder pods: with the file backend,",
         "   subdomain mode reads data/alice/ as alice.example.org and moves the root to data/www/, so every",
@@ -51,7 +51,11 @@
         "   and no app could read a pod's root (checked against the image, 2026-10-14).",
         "3. Authentication is stock dpop-bearer. pocpod0's UnsecureWebIdExtractor (trusts an unverified",
         "   'Authorization: WebID' header) never enters the image; an instance that needs it adds it in its",
-        "   own config, knowingly, and strips the header at its gateway."
+        "   own config, knowingly, and strips the header at its gateway.",
+        "4. The email sender is identity/email/overlay.json, written at every start by start/email.js from",
+        "   the instance's SMTP_* variables (instance-template/email.env): stock BaseEmailSender when they are",
+        "   set, stock default.json's 'No email server is configured.' when not. Stock default.json gave no",
+        "   way to reset a password."
       ]
     },
     {
