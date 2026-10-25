@@ -44,6 +44,10 @@ services:
       timeout: 10s
       retries: 10
       start_period: 40s
+    # Measured ~160 MiB idle (Maps of Making, 2026-10-25). Without a limit a
+    # leak or a burst takes the whole host down with it, the other stacks
+    # included; with one, only CSS restarts. A bigger instance raises it.
+    mem_limit: ${CSS_MEM_LIMIT:-512m}
     # No `ports:`: the gateway (Caddyfile.tmpl or gateway-vhost.conf.tmpl) reaches the server by
     # container name over the gateway network. A published port would be a
     # second way in that skips the gateway's TLS and header stripping.

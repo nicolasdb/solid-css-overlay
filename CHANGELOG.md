@@ -4,6 +4,14 @@ Versions are `<stock CSS version>-<n>`: a new stock release starts at `-1`, a
 new overlay on the same stock adds one. A tag `v<version>` publishes both
 images (`.github/workflows/build.yml`).
 
+## Unreleased
+
+- **CSS has a memory limit**: `mem_limit` 512m in `instance-template/compose.yml`,
+  `CSS_MEM_LIMIT` in `.env` to change it. Until now only the connector had
+  one, so a leak in CSS could take a small host down, other stacks included.
+  An instance gets it with the next tag, or at once with
+  `docker update --memory 512m --memory-swap 1g <instance>-css` (no restart).
+
 ## 7.2.0-7 — 2026-10-24
 
 Words, no behaviour change. An instance updates the image and nothing else.
