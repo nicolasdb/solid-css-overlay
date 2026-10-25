@@ -30,6 +30,13 @@ services:
       # is on, with its public URL. Read at start by the image (start/describe.js).
       - COMPOSE_PROFILES=${COMPOSE_PROFILES:-}
       - MCP_PUBLIC_BASE=${MCP_PUBLIC_BASE:-}
+    # The email sender, so "Forgot your password?" sends its link: SMTP_HOST,
+    # SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM (email.env.example). Its own
+    # git-ignored file, not .env, because it holds a password; absent, the
+    # server runs without mail as before 7.2.0-9 (start/email.js).
+    env_file:
+      - path: ./email.env
+        required: false
     volumes:
       - css-data:/data
       # The instance's own look and words (skin, fonts, welcome page, more

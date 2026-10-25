@@ -21,7 +21,9 @@ account lives there.
   - Deleting files from the volume from outside is not an option: that
     storage format is CSS's private business and can change at any release,
     and a script would race the server's locks.
-- **Admins are login emails listed in the instance's config.**
+- **Admins are login emails listed in the instance's config.** The config
+  is not edited by an instance, so the list comes from its environment and
+  is written at start, as the email sender is (`start/email.js`, 7.2.0-9).
 - **Front doors**, all calling that one route:
   1. `scripts/admin.sh` (list, delete-account), with a `make` target on the
      VPS;

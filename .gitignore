@@ -4,6 +4,7 @@ test/shots/
 .env
 # What an instance adds beside the template, in its checkout (instance-template/compose.yml).
 instance-template/mcp-connector/
+instance-template/email.env
 # An instance's override belongs in its overlay repo (overlay-template/); one
 # dropped here anyway must not dirty the checkout.
 instance-template/compose.override.yml

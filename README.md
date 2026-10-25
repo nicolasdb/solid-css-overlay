@@ -50,11 +50,11 @@ applied to one VPS, step by step.
 4. **The instance**, CSS first. It is a checkout of this repo at the tag it
    runs, used from `instance-template/`: its compose stays in its own repo,
    and an update is a `git checkout`. **The checkout is never edited**: what
-   the instance adds there (`.env`, `mcp-connector/`) is git-ignored, and its
+   the instance adds there (`.env`, `email.env`, `mcp-connector/`) is git-ignored, and its
    own look lives in another repo (step 8). One checkout per function, named
    after the instance (Maps of Making: `mom-pods`, `/srv/mom-pods`).
    ```sh
-   git clone --branch v7.2.0-8 https://github.com/nicolasdb/solid-css-overlay /srv/<instance>
+   git clone --branch v7.2.0-9 https://github.com/nicolasdb/solid-css-overlay /srv/<instance>
    cd /srv/<instance>/instance-template
    cp .env.example .env                       # every value; the comments say what
    mkdir -p mcp-connector && echo '{}' > mcp-connector/identities.json && touch mcp-connector/.env
@@ -124,7 +124,7 @@ ADR 010). Apps read the WebID's `solid:oidcIssuer`, fetch this, and offer what
 it lists; stock CSS has no such file, which means "nothing beyond Solid".
 
 ```json
-{ "software": "solid-css-overlay", "version": "7.2.0-8", "layout": "subdomain",
+{ "software": "solid-css-overlay", "version": "7.2.0-9", "layout": "subdomain",
   "capabilities": { "account": { "path": "/.account/" },
                     "onboard": { "path": "/onboard/" },
                     "connector": { "url": "https://mcp.pod.example.org/" } } }
@@ -140,6 +140,36 @@ it lists; stock CSS has no such file, which means "nothing beyond Solid".
   It grants nothing: the connector keeps `ONBOARD_CORS_ORIGINS`.
   `scripts/check-overrides.sh` checks it is served and agrees with
   `pod-layout.js`.
+
+### Email: "Forgot your password?"
+
+Without a mail server, CSS cannot send the reset link: the page answers
+"No email server is configured." and a forgotten password locks its owner
+out of their pod for good. To send it, in `instance-template/`:
+
+```sh
+cp email.env.example email.env && chmod 600 email.env   # then fill it
+docker compose up -d css
+```
+
+`SMTP_HOST`, `SMTP_PORT` (587), `SMTP_USER`, `SMTP_PASS`, `EMAIL_FROM`; the
+example has Resend's values. Its own file, not `.env`, because it holds a
+password; Compose reads it only if it exists. At every start the image
+(`start/email.js`) writes CSS's sender from them, the stock
+`BaseEmailSender`, or stock's "no email server" when `SMTP_HOST` is empty.
+The start log says which: `[solid-css-overlay] email: ...`. `SMTP_HOST` set
+with a value missing stops the start, so a broken sender is seen at deploy,
+not by someone locked out.
+
+- **STARTTLS only** (587, 2587): stock CSS passes host, port and login to
+  nodemailer and nothing else, so implicit TLS (465) cannot be set.
+- `EMAIL_FROM`'s domain must be one the SMTP service may send for (SPF and
+  DKIM in its zone).
+- The values are in the container's environment: `docker inspect` shows
+  them to whoever may run it (the `docker` group is root-equivalent anyway).
+- The mail is `overlay/templates/identity/password/reset-email.html.ejs`;
+  the link works 15 minutes, once (stock). CSS answers the same whether the
+  email has an account or not.
 
 ### Wildcard certificate (DNS-01)
 
@@ -292,9 +322,9 @@ The skin audit (contrast, complete slot set) lives in solid-kit:
 | `pod-name-guard/` | the one component: pod names that make valid hostnames |
 | `upstream-baseline.sha256`, `scripts/check-overrides.sh` | the stock templates `overlay/` replaces, hashed |
 | `test/` | `try-local.sh` (runs the image) + `smoke.mjs` (a real browser, both layouts) |
-| `instance-template/` | what an instance runs from (its checkout): compose, `.env.example`, the Caddy and nginx gateway templates |
+| `instance-template/` | what an instance runs from (its checkout): compose, `.env.example`, `email.env.example`, the Caddy and nginx gateway templates |
 | `overlay-template/` | what the `pods/` folder of a vertical's design-system repo starts from (ADR 011) |
-| `start/` | the image's entrypoint: writes `provider.json` and `pod-layout.js`, then runs stock CSS |
+| `start/` | the image's entrypoint: writes `provider.json`, `pod-layout.js` and the email sender, then runs stock CSS |
 | `gateway-caddy/` | Caddy + the OVH DNS module, for the wildcard certificate |
 | `docs/` | `faq.md` (sign-in lifetimes, consent), install briefs for one VPS (`handoff-mapsofmaking.md`) |
 | `ROADMAP.md` | planned features: account deletion, the right to erasure |

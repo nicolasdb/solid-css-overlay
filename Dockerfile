@@ -57,11 +57,12 @@ COPY skins/pod/fonts/ templates/fonts/skin/
 COPY config/ /config/
 ENV CSS_CONFIG=/config/instance.json
 
-# What this instance offers (/.well-known/css/provider.json) and its pod layout
-# for the pages, written at every start from the environment, then the stock
+# What this instance offers (/.well-known/css/provider.json), its pod layout
+# for the pages and its email sender (config/identity/email/overlay.json, which
+# both configs import), written at every start from the environment, then the stock
 # server. The version is the tag (the publish job passes it); local builds say dev.
 ARG OVERLAY_VERSION=dev
 ENV OVERLAY_VERSION=${OVERLAY_VERSION}
-COPY start/describe.js start/start.sh /opt/overlay/
+COPY start/describe.js start/email.js start/start.sh /opt/overlay/
 ENTRYPOINT ["/opt/overlay/start.sh"]
 # CSS_BASE_URL is the instance's (compose .env); CSS_ROOT_FILE_PATH=/data is stock.
