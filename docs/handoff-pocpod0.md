@@ -101,7 +101,7 @@ Nothing is started yet.
 ### 4. Cutover (with Nicolas's go)
 
 ```sh
-cd /home/nicolas/pocpod0 && docker compose stop community-solid-server mcp-connector
+cd /home/nicolas/pocpod0 && docker compose stop community-solid-server mcp-connector qdrant   # qdrant is retired
 
 cd /srv/nicolasdb-pods/instance-template
 docker compose create          # makes the containers and the empty volumes, starts nothing
@@ -156,7 +156,19 @@ the rollback stays in `nicolasdb-pods_css-data` only.
 - The pocpod0 `vps-mode` PR (CSS, connector and qdrant out of its compose,
   oxigraph on the `gateway` network, backups of the new volumes) is merged
   and deployed, the same day if possible: until then the nightly backup
-  archives the old volumes, not the new one. Meanwhile, by hand:
+  archives the old volume, not the new one. From the workstation, in pocpod0
+  on `vps-mode`:
+  ```sh
+  make vps-push            # refuses: lists infra/css/* and scripts/check-css-overrides.sh to delete
+  make vps-push FORCE=1    # only if that list holds nothing else
+  ssh hetzner 'cd /home/nicolas/pocpod0 && docker compose up -d --remove-orphans'
+  make vps-backup-schedule
+  ssh hetzner '/usr/local/sbin/pocpod0-backup; journalctl -t pocpod0-backup -n 1'
+  ```
+  `--remove-orphans` removes the three stopped containers, never a volume.
+  The backup now fails on a volume that does not exist: if the journal says
+  `no volume pocpod0_openclaw-data-default`, report it rather than create it.
+  Until the PR is deployed, a backup by hand:
   ```sh
   docker run --rm -v nicolasdb-pods_css-data:/data:ro alpine tar czf - /data \
     > /home/nicolas/pocpod0/backups/nicolasdb-pods-css-data-$(date +%F).tar.gz
