@@ -1,5 +1,9 @@
 # Handoff: pod.nicolasdb.eu moves from pocpod0 to the image
 
+**Status 2026-10-27: done, the cutover held** on `7.2.0-10-rc.1`. Left:
+step 6 (pocpod0#4 merged and deployed, then the new volumes in the nightly
+backup).
+
 A brief for a Claude Code session on Nicolas's computer, the only place that
 reaches the Hetzner VPS (`ssh hetzner`). Today pod.nicolasdb.eu is stock CSS
 7.2.0 run by pocpod0's compose (`community-solid-server`, with pocpod0's own
@@ -68,8 +72,10 @@ Report all of it. **Stop and ask** if:
   the pipeline, troll or OpenClaw. The image refuses the `Authorization:
   WebID` header those send; deciding what happens to them comes first;
 - the recorded base URL is not exactly `https://pod.nicolasdb.eu/`;
-- free memory is under ~600 MiB with everything running (the instance's CSS
-  idles at ~125 MiB and is capped at 512 MiB; the old one stops at cutover).
+- available memory is under ~600 MiB with everything running: the
+  `available` column of `free -m`, not `free`, which leaves out the cache
+  the kernel gives back on demand (the instance's CSS idles at ~125 MiB and
+  is capped at 512 MiB; the old one stops at cutover).
 
 ### 1. Backup
 
