@@ -4,7 +4,7 @@ Versions are `<stock CSS version>-<n>`: a new stock release starts at `-1`, a
 new overlay on the same stock adds one. A tag `v<version>` publishes both
 images (`.github/workflows/build.yml`).
 
-## 7.2.0-11 — unreleased
+## 7.2.0-11 — 2026-10-27
 
 The image is unchanged; an instance gets a way to update itself.
 

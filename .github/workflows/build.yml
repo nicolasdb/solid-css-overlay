@@ -1,5 +1,9 @@
-# Every push: the guard's and the connector's tests, the image built, and the
-# smoke run against that image in both pod layouts. A tag v<stock>-<n>
+# Every PR, every push to main and every tag: the guard's and the
+# connector's tests, the image built, and the smoke run against that image in
+# both pod layouts. Once per commit: a PR branch runs through pull_request
+# only (it ran twice, push and pull_request, until 7.2.0-11). A change to
+# docs only (*.md, docs/) skips it; a tag never does (GitHub applies no path
+# filter to tags), so nothing is published untested. A tag v<stock>-<n>
 # (v7.2.0-1) also publishes both images to GHCR as <stock>-<n>, public. A
 # pre-release tag v<stock>-<n>-rc.<m> publishes <stock>-<n>-rc.<m> the same
 # way, for the one instance that tries a version first (README, "Updating").
@@ -7,9 +11,17 @@ name: build
 
 on:
   push:
-    branches: ["**"]
+    branches: [main]
     tags: ["v*"]
+    paths-ignore: ["**.md", "docs/**"]
   pull_request:
+    paths-ignore: ["**.md", "docs/**"]
+
+# A new push to a PR stops the run it makes obsolete. Never main or a tag:
+# every one of those runs to the end.
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -50,12 +62,17 @@ jobs:
       - name: stock templates unchanged since the overlay was reconciled
         run: scripts/check-overrides.sh
 
-      - name: browser for the smoke run
+      # The runner's own Google Chrome, not a downloaded one:
+      # `npx playwright install --with-deps chromium` installed system packages
+      # through apt on every run, 18 s on a good day and 11 min 40 s on
+      # 2026-10-27. If the runner's Chrome ever breaks the smoke run, put that
+      # line back and drop CHROMIUM_PATH below.
+      - name: the smoke run's library (the runner's own Chrome)
         working-directory: test
-        run: npm ci && npx playwright install --with-deps chromium
+        run: npm ci && /usr/bin/google-chrome --version
 
       - name: smoke, subdomain pods (the image's default)
-        env: { POD_LAYOUT: subdomain, TRY_NETWORK: host }
+        env: { POD_LAYOUT: subdomain, TRY_NETWORK: host, CHROMIUM_PATH: /usr/bin/google-chrome }
         run: |
           test/try-local.sh 3123
           node test/smoke.mjs http://localhost:3123 test/shots/subdomain
@@ -63,7 +80,7 @@ jobs:
           docker rm -f try-css-overlay-3123
 
       - name: smoke, folder pods (config/suffix.json)
-        env: { POD_LAYOUT: suffix, TRY_NETWORK: host }
+        env: { POD_LAYOUT: suffix, TRY_NETWORK: host, CHROMIUM_PATH: /usr/bin/google-chrome }
         run: |
           test/try-local.sh 3124
           node test/smoke.mjs http://localhost:3124 test/shots/suffix
