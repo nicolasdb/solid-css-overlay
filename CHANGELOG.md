@@ -4,11 +4,13 @@ Versions are `<stock CSS version>-<n>`: a new stock release starts at `-1`, a
 new overlay on the same stock adds one. A tag `v<version>` publishes both
 images (`.github/workflows/build.yml`).
 
-## 7.2.0-10 — unreleased
+## 7.2.0-10 — 2026-10-27
 
 The first version tried on one instance before the others: pre-release tags
 (`v7.2.0-10-rc.1`), run on pod.nicolasdb.eu first (README, "Updating an
-instance"). An instance updates the image; nothing to change in `.env`.
+instance"), where it held through that server's move from pocpod0's own CSS
+to the image (`docs/handoff-pocpod0.md`). An instance updates the image;
+nothing to change in `.env`.
 
 - **The welcome page is put back at every start** (`start/welcome.js`), from
   the image or from the vertical's design-system repo (`pods/welcome/`). It was

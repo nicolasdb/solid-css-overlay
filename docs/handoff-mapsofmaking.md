@@ -14,7 +14,7 @@ particular to Maps of Making.
 | Connector (`MCP_PUBLIC_BASE`) | `https://mcp.pod.mapsofmaking.org/` |
 | `MCP_ALLOWED_HOSTS` | `mcp.pod.mapsofmaking.org,pod.mapsofmaking.org` (the second is for `/onboard/`) |
 | `INSTANCE_NAME` | `mom-pods`: containers `mom-pods-css` and `mom-pods-mcp-connector`, volume `mom-pods_css-data`. One checkout per function, prefix `mom-` |
-| `CSS_OVERLAY_VERSION` | `7.2.0-9`, the same as the tag checked out |
+| `CSS_OVERLAY_VERSION` | `7.2.0-10`, the same as the tag checked out |
 | `GATEWAY_NETWORK` | `proxy` |
 | DNS | OVH, zone `mapsofmaking.org`. The site on `mapsofmaking.org` lives on another server (Hetzner) and is not touched |
 | VPS | Debian 13, Docker 29.7.2, Compose v5.5.0; 3.7 GiB RAM, 2 GiB swap (2026-10-25); IPv4 `92.222.71.103`, IPv6 `2001:41d0:404:200::94de` |
@@ -226,6 +226,27 @@ The same steps with `v7.2.0-9`. Then the mail, once:
    `[solid-css-overlay] email: smtp.resend.com:587 as Maps of Making <pods@mapsofmaking.org>`.
 4. Check: "Forgot your password?" on `nicolas-test`'s login; the mail
    arrives, the link sets a new password, the new password logs in.
+
+## Updating to 7.2.0-10 (welcome page at every start, a new pod's README)
+
+The same steps with `v7.2.0-10`. Tried first on pod.nicolasdb.eu as
+`7.2.0-10-rc.1`. Then:
+- **The welcome page is written at every start.** The root page
+  (`/data/www/index.html`) becomes `mapsofmaking/design-system`'s
+  `pods/welcome/index.html` when `.env` loads that repo's override with the
+  page mounted, or the image's generic page otherwise. A page copied in by
+  hand that is in neither place is replaced: put it in the design-system repo
+  first. Check: `docker logs mom-pods-css 2>&1 | grep 'welcome page'` says
+  `written to /data/www/index.html` or `up to date`, and
+  `https://pod.mapsofmaking.org/` shows the expected page.
+- **A new pod's README is the image's** (what is in the pod, what is public,
+  sharing, apps and agents; no Databrowser). Maps of Making's own words go in
+  `pods/pod/README.md.hbs` of its design-system repo (its issue #2), mounted
+  by the line `overlay-template/compose.override.yml` now has. Pods made
+  before keep theirs. Check: a throwaway pod's `README`.
+- **A change of look** from now on: `git pull` in `/srv/mom-design-system`,
+  then `docker compose up -d --force-recreate css` here. A plain `up -d`
+  keeps the files from before the pull.
 
 ## Between test rounds
 
