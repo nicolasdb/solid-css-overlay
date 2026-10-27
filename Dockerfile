@@ -45,10 +45,11 @@ COPY overlay/main.html.ejs templates/main.html.ejs
 COPY overlay/main.css templates/styles/main.css
 COPY overlay/pod-ui.js overlay/pod-layout.js templates/scripts/
 COPY overlay/templates/identity/ templates/identity/
+COPY overlay/templates/pod/ templates/pod/
 COPY overlay/doc-view/doc-view.js overlay/doc-view/doc-view.css templates/doc-view/
 # The welcome page replaces the stock intro page, which initialize-intro.json
-# writes into the root container on FIRST start only: on an existing data
-# volume, a new welcome page has to be copied in (README, "The welcome page").
+# writes into the root container on first start only; start/welcome.js puts it
+# there again at every later start (README, "The welcome page").
 COPY overlay/welcome/index.html templates/root/intro/base/index.html
 # The default skin. An instance mounts its own skin.css and fonts over these.
 COPY skins/pod/skin.css templates/styles/skin.css
@@ -63,6 +64,6 @@ ENV CSS_CONFIG=/config/instance.json
 # server. The version is the tag (the publish job passes it); local builds say dev.
 ARG OVERLAY_VERSION=dev
 ENV OVERLAY_VERSION=${OVERLAY_VERSION}
-COPY start/describe.js start/email.js start/start.sh /opt/overlay/
+COPY start/describe.js start/email.js start/welcome.js start/start.sh /opt/overlay/
 ENTRYPOINT ["/opt/overlay/start.sh"]
 # CSS_BASE_URL is the instance's (compose .env); CSS_ROOT_FILE_PATH=/data is stock.

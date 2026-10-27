@@ -25,7 +25,8 @@ there, only without this overlay's extras.
 | **Pods are subdomains** | `https://<name>.<server host>/`, WebID `https://<name>.<server host>/profile/card#me`. The default for every new instance. |
 | **Pod names are checked** | `PodNameGuard` (`pod-name-guard/`) refuses, with a 400 the form shows, a name that cannot be a hostname (`open_fab`, 64+ characters, a hyphen at either end) and reserved names (`www`, `mcp`, `api`, …: `config/instance.json`). CSS alone checks only that the name is not empty. The form runs the same check first. |
 | **Authentication is stock** | DPoP and Bearer only. pocpod0's `UnsecureWebIdExtractor` is not in the image. |
-| **The welcome page** | Ours, written into the root on first start (`initialize-intro.json`). |
+| **The welcome page** | Ours, or the vertical's from its design-system repo, put at the root at every start (`start/welcome.js`). |
+| **The README a new pod starts with** | Ours: what is in the pod, what is public, how sharing and agents work, no Databrowser. Or the vertical's, from the same repo. |
 | **CSS itself** | Untouched. Files are added where stock CSS already looks (`templates/`), plus one config and one component. |
 
 `config/suffix.json` keeps pods as folders (`https://<server>/<name>/`), for an
@@ -113,8 +114,9 @@ applied to one VPS, step by step.
    DESIGN_SYSTEM=/srv/<vertical>-design-system
    ```
    then `docker compose up -d`. Nothing is built; a change of look is a commit
-   there, `git pull`, `docker compose up -d`. `overlay-template/README.md` has
-   the details.
+   there, `git pull`, `docker compose up -d --force-recreate css` (a plain
+   `up -d` keeps the old container and files). `overlay-template/README.md`
+   has the details.
 
 ### What this instance offers: `/.well-known/css/provider.json`
 
@@ -230,18 +232,21 @@ same shape.
 
 ### The welcome page
 
-It is the root container's `index.html`, written from the image **on first
-start only**. On an instance that already has data, a new welcome page (a new
-image version, or a new `pods/welcome/index.html` in the design-system repo)
-is copied in by hand, from the instance's folder:
+It is the root container's `index.html`: the server's home page, where a
+vertical lists its family of apps. It comes from the `pods/` folder of the
+vertical's design-system repo (`pods/welcome/index.html`, mounted by its
+`compose.override.yml`), or, without one, the image's generic page, which
+names no app.
 
-```sh
-docker compose cp "$DESIGN_SYSTEM/pods/welcome/index.html" css:/data/www/index.html   # subdomain pods
-docker compose cp "$DESIGN_SYSTEM/pods/welcome/index.html" css:/data/index.html       # config/suffix.json
-```
+Stock CSS writes it into the data on first start only. Since 7.2.0-10 the
+image puts it there again at **every start** (`start/welcome.js`, which logs
+what it did). A new image version reaches the server with the usual update; a
+new page in the design-system repo with `git pull` there and
+`docker compose up -d --force-recreate css` (a plain `up -d` keeps the
+container). Before, it was copied in by hand with `docker compose cp`.
 
-Without a welcome page of its own, the instance copies the image's generic one
-from its checkout, `../overlay/welcome/index.html`, the same way.
+It is the instance's page, not a document people edit: one changed through
+Solid is replaced at the next start. Edit it in the design-system repo.
 
 Why not served from the image at every start (`static-root.json`): CSS 7.2
 matches static files on the path alone, ignoring the host, so with subdomain
@@ -260,6 +265,15 @@ templates (a gateway template is copied, so it is updated by hand), and
 design-system repo's `pods/` folder. A new stock CSS gives `7.x.y-1`; a new overlay on the same stock, `-n+1`
 (`CHANGELOG.md`). A design-system repo that mounts its own copy of a generic file
 diffs it against the new version first.
+
+**Trying a version before the others get it.** A release starts as a
+pre-release tag on its PR's branch, `v<version>-rc.<n>` (`v7.2.0-10-rc.1`),
+which publishes both images as `<version>-rc.<n>`. One instance runs it
+first, pod.nicolasdb.eu, updated as above with that tag and that version in
+`.env`. Once it holds there, the PR is merged and `main` tagged
+`v<version>`, which every other instance (Maps of Making, ...) takes. A
+pre-release tag never goes on `main`, and an instance other than the trial
+one never runs one. Going back is the same steps with the previous tag.
 
 ## Accounts and pods: what CSS does and does not do
 
@@ -317,14 +331,14 @@ The skin audit (contrast, complete slot set) lives in solid-kit:
 |---|---|
 | `Dockerfile` | stock CSS + everything below |
 | `config/instance.json`, `config/suffix.json` | the two configs; the comments say why each line differs from stock |
-| `overlay/` | the pages: `main.html.ejs`, `main.css`, `pod-ui.js`, `pod-layout.js`, `templates/identity/**`, `welcome/`, `doc-view/` (generated from solid-kit, `SOURCE`) |
+| `overlay/` | the pages: `main.html.ejs`, `main.css`, `pod-ui.js`, `pod-layout.js`, `templates/identity/**`, `templates/pod/base/README$.md.hbs` (a new pod's README), `welcome/`, `doc-view/` (generated from solid-kit, `SOURCE`) |
 | `skins/pod/` | the default skin |
 | `pod-name-guard/` | the one component: pod names that make valid hostnames |
 | `upstream-baseline.sha256`, `scripts/check-overrides.sh` | the stock templates `overlay/` replaces, hashed |
 | `test/` | `try-local.sh` (runs the image) + `smoke.mjs` (a real browser, both layouts) |
 | `instance-template/` | what an instance runs from (its checkout): compose, `.env.example`, `email.env.example`, the Caddy and nginx gateway templates |
 | `overlay-template/` | what the `pods/` folder of a vertical's design-system repo starts from (ADR 011) |
-| `start/` | the image's entrypoint: writes `provider.json`, `pod-layout.js` and the email sender, then runs stock CSS |
+| `start/` | the image's entrypoint: writes `provider.json`, `pod-layout.js`, the email sender and the welcome page, then runs stock CSS |
 | `gateway-caddy/` | Caddy + the OVH DNS module, for the wildcard certificate |
 | `docs/` | `faq.md` (sign-in lifetimes, consent), install briefs for one VPS (`handoff-mapsofmaking.md`) |
 | `ROADMAP.md` | planned features: account deletion, the right to erasure |

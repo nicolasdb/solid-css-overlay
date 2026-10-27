@@ -22,7 +22,8 @@ pages, with the kit skin once `skins/kit/skin.css` exists.
 
 | File | Replaces | Notes |
 |---|---|---|
-| `welcome/index.html` | the welcome page | written into the data **once, on first start**; afterwards see the image README, "The welcome page". May list the vertical's apps (the commented example in the image's page). |
+| `welcome/index.html` | the welcome page | the server's home page: where the vertical lists its family of apps (the commented example in the image's page). Put at the root at every start. |
+| `pod/README.md.hbs` | the README every new pod starts with | the image's (`overlay/templates/pod/base/README$.md.hbs`) is the one to start from; same Handlebars variables. Pods made before keep theirs. |
 | `instance.json` | `config/instance.json` | only to reserve more pod names (every service host the gateway serves under this domain) |
 
 The skin's fonts are served by this image from the mounted `skins/kit/fonts/`,
@@ -49,8 +50,11 @@ DESIGN_SYSTEM=/srv/<vertical>-design-system
 Then, in `/srv/<instance>/instance-template/`: `docker compose up -d`.
 
 **A change** of look is a commit in the design-system repo, then `git pull` in
-`/srv/<vertical>-design-system` and `docker compose up -d` in the instance's
-folder. No image is rebuilt, and nothing is edited on the VPS.
+`/srv/<vertical>-design-system` and, in the instance's folder,
+`docker compose up -d --force-recreate css`. No image is rebuilt, and nothing
+is edited on the VPS. A plain `up -d` is not enough: Compose sees no change and
+keeps the container, and a file mounted on its own (`skin.css`) stays the copy
+from before the pull, because git replaces the file rather than rewriting it.
 
 **A new solid-css-overlay version**: diff its `overlay-template/` against the
 previous one, and any generic file copied here against the image's new copy.
