@@ -256,9 +256,25 @@ included, and no app could read a pod's root. Checked against the image,
 
 ## Updating an instance
 
-In the instance's checkout: `git fetch --tags && git checkout v<new>`, the
-same version as `CSS_OVERLAY_VERSION` in `instance-template/.env`, then
-`docker compose pull && docker compose up -d`. `git diff v<old> v<new> --
+One command on the VPS, from 7.2.0-11:
+
+```sh
+/srv/<instance>/instance-template/update.sh 7.2.0-12
+```
+
+`instance-template/update.sh` checks first and changes nothing if a check
+fails: the checkout has no edits, the tag exists, and the live welcome page
+would not be lost. A page copied in by hand is saved and the script asks.
+Then it checks out the tag, sets `CSS_OVERLAY_VERSION` in `.env`, pulls,
+recreates the containers and waits until they are healthy and the server
+says it runs the new version. If any of that fails, it goes back to the
+version it started from the same way. `-y` skips the question, and stops
+instead of losing a welcome page. The data volume is never touched. Its
+header has the first run, on a checkout older than the script.
+
+By hand, it is: `git fetch --tags && git checkout v<new>`, the same version
+as `CSS_OVERLAY_VERSION` in `instance-template/.env`, then
+`docker compose pull && docker compose up -d --force-recreate`. `git diff v<old> v<new> --
 instance-template/` shows what changed in the compose and the gateway
 templates (a gateway template is copied, so it is updated by hand), and
 `git diff v<old> v<new> -- overlay-template/` what changed for the
@@ -269,11 +285,11 @@ diffs it against the new version first.
 **Trying a version before the others get it.** A release starts as a
 pre-release tag on its PR's branch, `v<version>-rc.<n>` (`v7.2.0-10-rc.1`),
 which publishes both images as `<version>-rc.<n>`. One instance runs it
-first, pod.nicolasdb.eu, updated as above with that tag and that version in
-`.env`. Once it holds there, the PR is merged and `main` tagged
+first, pod.nicolasdb.eu, updated as above
+(`update.sh 7.2.0-11-rc.1`). Once it holds there, the PR is merged and `main` tagged
 `v<version>`, which every other instance (Maps of Making, ...) takes. A
 pre-release tag never goes on `main`, and an instance other than the trial
-one never runs one. Going back is the same steps with the previous tag.
+one never runs one. Going back is `update.sh <previous version>`.
 
 ## Accounts and pods: what CSS does and does not do
 
@@ -336,7 +352,7 @@ The skin audit (contrast, complete slot set) lives in solid-kit:
 | `pod-name-guard/` | the one component: pod names that make valid hostnames |
 | `upstream-baseline.sha256`, `scripts/check-overrides.sh` | the stock templates `overlay/` replaces, hashed |
 | `test/` | `try-local.sh` (runs the image) + `smoke.mjs` (a real browser, both layouts) |
-| `instance-template/` | what an instance runs from (its checkout): compose, `.env.example`, `email.env.example`, the Caddy and nginx gateway templates |
+| `instance-template/` | what an instance runs from (its checkout): compose, `.env.example`, `email.env.example`, `update.sh`, the Caddy and nginx gateway templates |
 | `overlay-template/` | what the `pods/` folder of a vertical's design-system repo starts from (ADR 011) |
 | `start/` | the image's entrypoint: writes `provider.json`, `pod-layout.js`, the email sender and the welcome page, then runs stock CSS |
 | `gateway-caddy/` | Caddy + the OVH DNS module, for the wildcard certificate |
