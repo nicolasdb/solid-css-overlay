@@ -44,6 +44,9 @@ jobs:
             -e OVH_ENDPOINT=ovh-eu -e OVH_APPLICATION_KEY=x -e OVH_APPLICATION_SECRET=x -e OVH_CONSUMER_KEY=x \
             caddy-ovh:ci caddy validate --config /etc/caddy/Caddyfile
 
+      - name: instance-template/update.sh parses
+        run: bash -n instance-template/update.sh
+
       - name: stock templates unchanged since the overlay was reconciled
         run: scripts/check-overrides.sh
 

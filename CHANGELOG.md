@@ -4,6 +4,22 @@ Versions are `<stock CSS version>-<n>`: a new stock release starts at `-1`, a
 new overlay on the same stock adds one. A tag `v<version>` publishes both
 images (`.github/workflows/build.yml`).
 
+## 7.2.0-11 — unreleased
+
+The image is unchanged; an instance gets a way to update itself.
+
+- **`instance-template/update.sh <version>`**: one command replaces the
+  update typed by hand (fetch, checkout, `.env`, pull, recreate, checks).
+  It changes nothing if a check fails (an edited checkout, no such tag, no
+  image), saves a welcome page copied in by hand and asks before it goes,
+  waits until the containers are healthy and the server says it runs the
+  new version, and goes back to the version it started from if not.
+  Tried on a 7.2.0-10 instance: an update, a tag with no image (went back),
+  a hand-made welcome page (saved, stopped), an edited checkout (stopped),
+  a design-system page replacing the generic one.
+- First run on an instance older than the script: its header, or the
+  handoffs' "Updating to 7.2.0-11".
+
 ## 7.2.0-10 — 2026-10-27
 
 The first version tried on one instance before the others: pre-release tags

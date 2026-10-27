@@ -184,7 +184,10 @@ the rollback stays in `nicolasdb-pods_css-data` only.
 - The welcome page's apps: edit `pods/welcome/index.html` in
   nicolasdb/design-system, `git pull` in `/srv/nicolasdb-design-system`, then
   `docker compose up -d --force-recreate css` in the instance's folder.
-- A new version: a new pre-release tag tried here first (README, "Updating
+- A new version: a new pre-release tag tried here first, with
+  `/srv/nicolasdb-pods/instance-template/update.sh <version>-rc.<n>` (the
+  first time, the copy from the tag: Maps of Making's handoff, "Updating to
+  7.2.0-11"). README, "Updating
   an instance"); the final tag goes to Maps of Making once it holds.
 
 ## Report back

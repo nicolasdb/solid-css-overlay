@@ -14,7 +14,7 @@ particular to Maps of Making.
 | Connector (`MCP_PUBLIC_BASE`) | `https://mcp.pod.mapsofmaking.org/` |
 | `MCP_ALLOWED_HOSTS` | `mcp.pod.mapsofmaking.org,pod.mapsofmaking.org` (the second is for `/onboard/`) |
 | `INSTANCE_NAME` | `mom-pods`: containers `mom-pods-css` and `mom-pods-mcp-connector`, volume `mom-pods_css-data`. One checkout per function, prefix `mom-` |
-| `CSS_OVERLAY_VERSION` | `7.2.0-10`, the same as the tag checked out |
+| `CSS_OVERLAY_VERSION` | `7.2.0-11`, the same as the tag checked out (`update.sh` keeps them so) |
 | `GATEWAY_NETWORK` | `proxy` |
 | DNS | OVH, zone `mapsofmaking.org`. The site on `mapsofmaking.org` lives on another server (Hetzner) and is not touched |
 | VPS | Debian 13, Docker 29.7.2, Compose v5.5.0; 3.7 GiB RAM, 2 GiB swap (2026-10-25); IPv4 `92.222.71.103`, IPv6 `2001:41d0:404:200::94de` |
@@ -247,6 +247,33 @@ The same steps with `v7.2.0-10`. Tried first on pod.nicolasdb.eu as
 - **A change of look** from now on: `git pull` in `/srv/mom-design-system`,
   then `docker compose up -d --force-recreate css` here. A plain `up -d`
   keeps the files from before the pull.
+
+## Updating to 7.2.0-11 (one command), from 7.2.0-9 or 7.2.0-10
+
+7.2.0-11 brings `update.sh`, which does the update and its checks. It also
+brings 7.2.0-10's changes (the section above says what to look at). The first
+time, the script is not in the checkout yet, so run the new version's copy:
+```sh
+ssh mom
+cd /srv/mom-pods/instance-template
+git fetch --tags
+git show v7.2.0-11:instance-template/update.sh > /tmp/update.sh
+bash /tmp/update.sh 7.2.0-11
+```
+It says what it checks, and asks once before restarting anything. A
+`WARNING` about the welcome page means the live page was copied in by hand:
+it is saved under `/root/`; answer `n`, put it in `mapsofmaking/design-system`
+(`pods/welcome/index.html`, mount line uncommented), `git pull` in
+`/srv/mom-design-system`, and run it again.
+
+Report its output from `== 1. Checks` to the end, then look at
+`https://pod.mapsofmaking.org/` in a browser, make one agent call, and open a
+throwaway pod's `README`.
+
+Every update after this one:
+```sh
+ssh mom /srv/mom-pods/instance-template/update.sh <version>
+```
 
 ## Between test rounds
 
