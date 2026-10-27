@@ -5,11 +5,12 @@
 #
 #   test/welcome-restart.sh <port>    # after test/try-local.sh <port>
 set -euo pipefail
-port="$1"; name="try-css-overlay-$port"; work="${TMPDIR:-/tmp}/$name"
+port="$1"; name="try-css-overlay-$port"
 layout="${POD_LAYOUT:-subdomain}"
-page="$work/data/$([ "$layout" = suffix ] || echo www/)index.html"
-[ -f "$page" ] || { echo "FAIL no welcome page at $page"; exit 1; }
-echo "<!doctype html><title>stale</title><p>an old welcome page" > "$page"
+page="/data/$([ "$layout" = suffix ] || echo www/)index.html"
+# Inside the container: the data is the server's (root), not the runner's.
+docker exec "$name" sh -c "test -f $page && echo '<!doctype html><title>stale</title><p>an old welcome page' > $page" \
+  || { echo "FAIL no welcome page at $page"; exit 1; }
 docker restart "$name" >/dev/null
 for _ in $(seq 60); do
   curl -fs --noproxy '*' -o /dev/null "http://localhost:$port/.account/login/password/" && break; sleep 1
