@@ -1,0 +1,50 @@
+{{!--
+  The README every new pod starts with, replacing stock's (which sends people
+  to the Databrowser: issue #13). Handlebars, filled by CSS at pod creation
+  with the same variables as stock ({{webId}}, {{oidcIssuer}}, {{base.path}});
+  this comment does not reach the pod. Pods made before an image change keep
+  their README. A vertical replaces this file from the pods/ folder of its
+  design-system repo (overlay-template/compose.override.yml).
+  It names no app: the server's home page lists them (solid-kit ADR 010,
+  detect, don't list), and the welcome page comes from the same folder.
+--}}
+# Welcome to your pod
+
+This is your space on the web. What you keep here is yours: apps come to it,
+and they ask you before they read or write anything.
+
+## What is here already
+
+- **`profile/card`**: your WebID, the address that says who you are
+  ({{webId}}). It is public on purpose, so apps and people can check who they
+  are dealing with. It says only what you put in it.
+- **This README**, public too, so anyone who opens your pod's address knows
+  what it is.
+- **The list of what sits at the top of your pod** can be seen by anyone who
+  has its address: the names only, not what is inside.
+
+Everything you add is private: only you can open it, until you share it.
+
+## Sharing, on your terms
+
+Open an app that looks after your pod, choose a file or a folder, and say who
+may see it. You can change your mind at any time, and taking access back works
+at once. The apps that work with this server are listed on its home page,
+[{{oidcIssuer}}]({{oidcIssuer}}).
+
+## Apps and agents
+
+- **An app you sign in to** acts as you: it can read and write what you can,
+  for as long as its sign-in lasts (an hour, or up to a day if you let it stay
+  signed in). The page where you say yes names the app first.
+- **An agent** (an AI assistant, a script) has its own identity in this pod,
+  under `profile/`. It reaches only what you share with it, and you remove it
+  from the app you made it with.
+
+## Your account
+
+Your pods, your WebIDs and your password: [your account]({{oidcIssuer}}.account/).
+
+---
+
+*This file is yours: edit it or delete it, it will not come back.*

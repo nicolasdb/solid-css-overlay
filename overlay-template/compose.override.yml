@@ -13,7 +13,8 @@
 # a folder means no skin at all). To turn one on, uncomment it and drop the
 # `[]` below the list (it only keeps an all-commented list valid). That is a
 # commit in the design-system repo, then `git pull` on the VPS and `docker
-# compose up -d` in the checkout.
+# compose up -d --force-recreate css` in the checkout (a plain `up -d` keeps
+# the container, and with it the files from before the pull).
 services:
   css:
     # environment:
@@ -26,9 +27,14 @@ services:
       # backoffice reads the same file): skins/kit/, not pods/.
       # - ${DESIGN_SYSTEM:?set DESIGN_SYSTEM in .env}/skins/kit/skin.css:/community-server/templates/styles/skin.css:ro
       # - ${DESIGN_SYSTEM:?set DESIGN_SYSTEM in .env}/skins/kit/fonts:/community-server/templates/fonts/skin:ro
-      # The pods' own words, in this folder. Written into the data on first
-      # start only (README, "The welcome page").
+      # The pods' own words, in this folder. The welcome page (the server's
+      # home page: where a vertical lists its family of apps) is put at the
+      # root at every start, so a new version is a `git pull` and the
+      # recreate above; nothing to copy (README, "The welcome page").
       # - ${DESIGN_SYSTEM:?set DESIGN_SYSTEM in .env}/pods/welcome/index.html:/community-server/templates/root/intro/base/index.html:ro
+      # The README every new pod starts with (`$$` is a literal `$` for
+      # Compose). Pods made before keep theirs.
+      # - ${DESIGN_SYSTEM:?set DESIGN_SYSTEM in .env}/pods/pod/README.md.hbs:/community-server/templates/pod/base/README$$.md.hbs:ro
       # More reserved pod names than the image's: a copy of config/instance.json.
       # - ${DESIGN_SYSTEM:?set DESIGN_SYSTEM in .env}/pods/instance.json:/config/instance.json:ro
       []

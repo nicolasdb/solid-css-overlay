@@ -14,3 +14,4 @@ edac5fa9f3e3ff6f70228137834d8550c1b099690d2ef83b37322714d8562278  identity/passw
 f99f165d8e87250bcc2ade76065c0fe624b7b50418bd7211abacd337496d4054  identity/password/forgot.html.ejs
 e279ff53c05fafe1d6934bc192b3a1582b348ae8ac7e711e5818e74ae9512976  identity/password/reset.html.ejs
 bcf1c2377eb25f2f98bd697e55e3f4030f4a1cdff93b1c7500e16e9eb07246dd  identity/password/reset-email.html.ejs
+5959dfa82a88b4c253b85b85cf506d4e3e9890d23f66e0657dfa1e0775341f2a  pod/base/README$.md.hbs

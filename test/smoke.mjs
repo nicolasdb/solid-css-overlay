@@ -92,6 +92,13 @@ for (const name of ["Atelier", "nicolas"]) {
   check((await page.textContent("#response-webId")) === `${podUrl(lower)}profile/card#me`, `create pod: the WebID is ${podUrl(lower)}profile/card#me`);
   await page.click("#response-account-link");
 }
+// The README a new pod starts with is ours (issue #13): stock's sent people to
+// the Databrowser. Public, like stock's.
+// Fetched by the browser: node cannot resolve <name>.localhost (try-local.sh).
+const readme = await page.evaluate((u) => fetch(u, { headers: { accept: "text/markdown" } }).then((r) => r.text()), `${podUrl("nicolas")}README`);
+check(readme.startsWith("# Welcome to your pod") && /What is here already/.test(readme) && !/Databrowser|\{\{/.test(readme),
+  `pod README: ours, filled in, no Databrowser (got "${readme.slice(0, 40)}")`);
+check(readme.includes(`${podUrl("nicolas")}profile/card#me`), "pod README: names the pod's WebID");
 
 // The pod root is a storage an app can read: Turtle, marked pim:Storage. With
 // static-root.json every pod root answered the welcome page instead (CSS

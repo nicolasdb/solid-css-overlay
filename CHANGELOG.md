@@ -4,6 +4,30 @@ Versions are `<stock CSS version>-<n>`: a new stock release starts at `-1`, a
 new overlay on the same stock adds one. A tag `v<version>` publishes both
 images (`.github/workflows/build.yml`).
 
+## 7.2.0-10 — unreleased
+
+The first version tried on one instance before the others: pre-release tags
+(`v7.2.0-10-rc.1`), run on pod.nicolasdb.eu first (README, "Updating an
+instance"). An instance updates the image; nothing to change in `.env`.
+
+- **The welcome page is put back at every start** (`start/welcome.js`), from
+  the image or from the vertical's design-system repo (`pods/welcome/`). It was
+  written on first start only, and every new page had to be copied in by hand
+  with `docker compose cp`. The root page is the instance's: one edited
+  through Solid is replaced at the next start. On an instance that copied in
+  a page of its own by hand, that page goes: put it in the design-system
+  repo first.
+- **A new pod's README is ours** (issue #13): what is in the pod, what is
+  public and why, how sharing and agents work, the account. Stock sent people
+  to the Databrowser. It names no app: the server's home page lists them. A
+  vertical replaces it from `pods/pod/README.md.hbs`. Pods made before keep
+  theirs. Checked by `check-overrides.sh` like the other stock templates.
+- **Pre-release tags publish**: `v<version>-rc.<n>` publishes both images as
+  `<version>-rc.<n>`, checked against this file's `## <version>` entry.
+- **A change of look needs `docker compose up -d --force-recreate css`**, not
+  `up -d`, which keeps the container and the files mounted before the
+  `git pull` (docs only; it was already so).
+
 ## 7.2.0-9 — 2026-10-25
 
 An instance updates the image; `email.env` is optional. Without it nothing
