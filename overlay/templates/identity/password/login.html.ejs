@@ -1,7 +1,7 @@
 <%# Override of CSS 7.2.0 identity/password/login.html.ejs (upstream-baseline.sha256).
     Copy only: every id, name and script line is stock. Adds an intro line. -%>
 <h1>Log in</h1>
-<p class="intro">Your pod is your own space on the web. Log in with the email and password you chose when you signed up.</p>
+<p class="intro">Your pod is your own space on the web. Log in with the email and passphrase you chose when you signed up.</p>
 <form method="post" id="mainForm">
   <p class="error" id="error"></p>
 
@@ -13,7 +13,7 @@
         <input id="email" type="email" name="email" autofocus>
       </li>
       <li>
-        <label for="password">Password</label>
+        <label for="password">Passphrase</label>
         <input id="password" type="password" name="password">
       </li>
       <li class="checkbox">
@@ -29,7 +29,7 @@
 
   <ul class="actions">
     <li><a id="register-link" href="" class="link">Create an account</a></li>
-    <li><a id="forgot-link"  href="" class="link">Forgot your password?</a></li>
+    <li><a id="forgot-link"  href="" class="link">Forgot your passphrase?</a></li>
   </ul>
 </form>
 
