@@ -4,7 +4,11 @@ Versions are `<stock CSS version>-<n>`: a new stock release starts at `-1`, a
 new overlay on the same stock adds one. A tag `v<version>` publishes both
 images (`.github/workflows/build.yml`).
 
-## Unreleased
+## 7.2.0-12 — 2026-10-31
+
+An instance updates the image; nothing to change in `.env` but the version.
+Released without a pre-release trial (the change is words and the update
+script); Maps of Making takes it first.
 
 - **Passphrase, not password**, on every page and in the reset mail: log in,
   sign up, forgot, reset, the account page. A few ordinary words beat one
