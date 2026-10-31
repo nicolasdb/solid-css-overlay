@@ -1,29 +1,29 @@
 <%# Override of CSS 7.2.0 identity/password/reset.html.ejs (upstream-baseline.sha256).
     Copy only: every id, name and script line is stock.  -%>
 <div id="input-partial">
-  <h1>Choose a new password</h1>
+  <h1>Choose a new passphrase</h1>
   <form method="post" id="mainForm">
     <p class="error" id="error"></p>
 
     <fieldset>
       <ol>
         <li>
-          <label for="password">New password</label>
+          <label for="password">New passphrase</label>
           <input id="password" type="password" name="password" placeholder="">
         </li>
         <li>
-          <label for="confirmPassword">Confirm new password</label>
+          <label for="confirmPassword">Confirm new passphrase</label>
           <input id="confirmPassword" type="password" name="confirmPassword" placeholder="">
         </li>
       </ol>
     </fieldset>
 
-    <p class="actions"><button type="submit" name="submit" disabled>Save the new password</button></p>
+    <p class="actions"><button type="submit" name="submit" disabled>Save the new passphrase</button></p>
   </form>
 </div>
 <div id="response-partial">
-  <h1>Your password is changed</h1>
-  <p>Log in with the new password from now on.</p>
+  <h1>Your passphrase is changed</h1>
+  <p>Log in with the new passphrase from now on.</p>
   <p class="actions"><button type="button" id="response-login-link">Log in</button></p>
 </div>
 

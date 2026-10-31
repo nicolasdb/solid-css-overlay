@@ -6,6 +6,11 @@ images (`.github/workflows/build.yml`).
 
 ## Unreleased
 
+- **Passphrase, not password**, on every page and in the reset mail: log in,
+  sign up, forgot, reset, the account page. A few ordinary words beat one
+  clever password, and the word says so. Labels only: field ids, names and
+  routes stay `password` (CSS's own). The reset mail's plain-text part is
+  written by CSS, not a template, and still says "password".
 - **`update.sh` no longer rolls back a good update on a long log.** Its last
   check read `docker logs … | grep -q` under `pipefail`: `grep -q` stops at the
   first match, `docker logs` dies of SIGPIPE, and the check failed although

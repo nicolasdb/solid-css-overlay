@@ -1,7 +1,7 @@
 <%# Override of CSS 7.2.0 identity/password/reset-email.html.ejs (upstream-baseline.sha256).
-    The mail "Forgot your password?" sends. Stock says "Click here" and nothing else, which reads
+    The mail "Forgot your passphrase?" sends. Stock says "Click here" and nothing else, which reads
     like phishing. Same one variable as stock (resetLink); the 15 minutes are stock
     BaseForgotPasswordStore's ttl. The plain-text part is written by CSS itself, not a template. -%>
-<p>Someone asked to reset the password of the pod account that uses this email address.</p>
-<p><a href="<%= resetLink %>">Choose a new password</a></p>
-<p>The link works for 15 minutes, once. If you did not ask, ignore this mail: your password stays as it is.</p>
+<p>Someone asked to reset the passphrase of the pod account that uses this email address.</p>
+<p><a href="<%= resetLink %>">Choose a new passphrase</a></p>
+<p>The link works for 15 minutes, once. If you did not ask, ignore this mail: your passphrase stays as it is.</p>
