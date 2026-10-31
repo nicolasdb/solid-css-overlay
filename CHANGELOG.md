@@ -4,6 +4,17 @@ Versions are `<stock CSS version>-<n>`: a new stock release starts at `-1`, a
 new overlay on the same stock adds one. A tag `v<version>` publishes both
 images (`.github/workflows/build.yml`).
 
+## Unreleased
+
+- **`update.sh` no longer rolls back a good update on a long log.** Its last
+  check read `docker logs … | grep -q` under `pipefail`: `grep -q` stops at the
+  first match, `docker logs` dies of SIGPIPE, and the check failed although
+  the server ran the new version. A small test instance never showed it; on
+  Maps of Making (2026-10-31) a healthy 7.2.0-11 went back to 7.2.0-9. Both
+  `grep -q` after a pipe now read to the end. An instance on 7.2.0-11 updates
+  next time with this copy:
+  `git show main:instance-template/update.sh > /tmp/update.sh && bash /tmp/update.sh <version>`.
+
 ## 7.2.0-11 — 2026-10-27
 
 The image is unchanged; an instance gets a way to update itself.

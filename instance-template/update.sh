@@ -72,7 +72,7 @@ echo "   $name: $old ($from_ref) -> $new (v$new)"
 
 say "2. The welcome page"
 page=www/index.html
-docker compose config | grep -q 'CSS_CONFIG: /config/suffix.json' && page=index.html
+docker compose config | grep 'CSS_CONFIG: /config/suffix.json' >/dev/null && page=index.html
 mounted="$(docker compose config --format json 2>/dev/null \
   | grep -o '"source": *"[^"]*pods/welcome/index.html"' | sed 's/.*"\([^"]*\)"$/\1/' || true)"
 if [ -n "$mounted" ]; then next="$(cat "$mounted")"; from="the design-system repo ($mounted)"
@@ -110,7 +110,10 @@ switch() { # version ref -> 0 when it runs and says so
     docker image inspect "$image" >/dev/null 2>&1 || { echo "   no image $image (not published, or the pull failed)"; return 1; }
   done
   docker compose up -d --force-recreate --wait --wait-timeout 180 || return 1
-  docker logs "$name-css" 2>&1 | grep -q "\[solid-css-overlay\] $1, " \
+  # Not `grep -q`: it stops reading at the first match, `docker logs` then
+  # dies of SIGPIPE, and with pipefail the check fails on an instance whose
+  # log is long (mom-pods, 2026-10-31: a healthy 7.2.0-11 rolled back).
+  docker logs "$name-css" 2>&1 | grep "\[solid-css-overlay\] $1, " >/dev/null \
     || { echo "   $name-css does not say it runs $1"; return 1; }
 }
 
