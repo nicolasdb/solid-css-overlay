@@ -138,6 +138,12 @@ it lists; stock CSS has no such file, which means "nothing beyond Solid".
 - `onboard` and `connector` are listed only with the connector profile on
   (`COMPOSE_PROFILES=connector`), the connector's URL from `MCP_PUBLIC_BASE`.
   A capability not listed is not offered.
+- `register` is listed only with `OPEN_REGISTRATION=true` in the instance's
+  `.env` (ADR 010 amendment, point 9): `{ "path": "/.account/", "podNames":
+  "<layout>" }`. It says an app on the same site may create accounts here; it
+  does not open anything (CSS always lets anyone sign up), so turn it on once
+  the gateway rate-limits `/.account/` (point 11). No entry, no creation
+  offered: the app sends the person to the provider's own sign-up page.
 - **A public contract**: fields are only ever added, never renamed or removed.
   It grants nothing: the connector keeps `ONBOARD_CORS_ORIGINS`.
   `scripts/check-overrides.sh` checks it is served and agrees with
@@ -259,7 +265,7 @@ included, and no app could read a pod's root. Checked against the image,
 One command on the VPS, from 7.2.0-11:
 
 ```sh
-/srv/<instance>/instance-template/update.sh 7.2.0-12
+/srv/<instance>/instance-template/update.sh 7.2.0-13
 ```
 
 `instance-template/update.sh` checks first and changes nothing if a check

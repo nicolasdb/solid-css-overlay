@@ -4,6 +4,19 @@ Versions are `<stock CSS version>-<n>`: a new stock release starts at `-1`, a
 new overlay on the same stock adds one. A tag `v<version>` publishes both
 images (`.github/workflows/build.yml`).
 
+## 7.2.0-13 — 2026-11-02
+
+An instance updates the image; nothing to change in `.env` but the version.
+`register` stays unlisted until the instance sets `OPEN_REGISTRATION=true`.
+
+- **`register` in the descriptor.** With `OPEN_REGISTRATION=true` in the
+  instance's `.env`, `provider.json` lists
+  `"register": { "path": "/.account/", "podNames": "<layout>" }` (solid-kit
+  ADR 010 amendment, point 9), which Maps of Making home (Epic 14, story 14.3)
+  reads before offering to create a pod. Off by default; an instance turns it
+  on after rate-limiting `/.account/` at its gateway. `check-overrides.sh`
+  checks the entry agrees with the account path and the layout.
+
 ## 7.2.0-12 — 2026-10-31
 
 An instance updates the image; nothing to change in `.env` but the version.
