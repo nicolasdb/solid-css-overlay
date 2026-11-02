@@ -30,6 +30,10 @@ services:
       # is on, with its public URL. Read at start by the image (start/describe.js).
       - COMPOSE_PROFILES=${COMPOSE_PROFILES:-}
       - MCP_PUBLIC_BASE=${MCP_PUBLIC_BASE:-}
+      # "true" lists `register` in the descriptor: an app on the same site may
+      # create accounts (ADR 010 amendment, points 8-11). Set it only once the
+      # gateway rate-limits /.account/.
+      - OPEN_REGISTRATION=${OPEN_REGISTRATION:-}
     # The email sender, so "Forgot your password?" sends its link: SMTP_HOST,
     # SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM (email.env.example). Its own
     # git-ignored file, not .env, because it holds a password; absent, the

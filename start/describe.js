@@ -25,6 +25,15 @@ if (profiles.includes("connector") && env.MCP_PUBLIC_BASE) {
   capabilities.connector = { url: env.MCP_PUBLIC_BASE };
 }
 
+// Open registration is the instance's own declaration, never a guess: stock CSS
+// always lets anyone create an account, so only the operator can say "this is
+// meant to be public" (ADR 010 point 11: after the gateway rate-limits
+// /.account/). Unlisted means apps send the person to the provider's own page.
+// podNames repeats `layout`: it is the form an app suggests an address in.
+if ((env.OPEN_REGISTRATION || "").trim().toLowerCase() === "true") {
+  capabilities.register = { path: "/.account/", podNames: layout };
+}
+
 const descriptor = {
   software: "solid-css-overlay",
   version: env.OVERLAY_VERSION || "dev",

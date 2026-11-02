@@ -74,6 +74,9 @@ if [ -n "$url" ]; then
     bad "provider.json is not a solid-css-overlay descriptor"
   else
     ok "provider.json served ($layout pods, offers: $(node -e 'process.stdout.write(Object.keys(JSON.parse(require("fs").readFileSync(0, "utf8")).capabilities).join(", "))' <<<"$desc"))"
+    # `register`, when listed, must point at the account API and name the layout.
+    node -e 'const d = JSON.parse(require("fs").readFileSync(0, "utf8")); const r = d.capabilities.register; if (r && (r.path !== d.capabilities.account.path || r.podNames !== d.layout)) process.exit(1)' <<<"$desc" \
+      && ok "register (if offered) agrees with account and layout" || bad "register disagrees with the account path or the layout"
     grep -q "podLayout = \"$layout\"" <<<"$(curl -fsS "$url/.well-known/css/scripts/pod-layout.js")" \
       && ok "pod-layout.js says $layout too" || bad "pod-layout.js disagrees with provider.json ($layout)"
   fi
