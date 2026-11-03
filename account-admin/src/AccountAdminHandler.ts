@@ -142,9 +142,18 @@ export class AccountAdminHandler extends JsonInteractionHandler {
   }
 
   private async list(): Promise<AccountSummary[]> {
-    const accounts: AccountSummary[] = [];
+    // Ids first, details after. entries() streams the account container
+    // (JsonResourceStorage) while CSS holds its lock; looking up logins and
+    // pods inside that loop waited on the same lock, which expired after 6 s
+    // and took the whole server down ("Lock expired after 6000ms", first CI
+    // run of the admin tool, 2026-11-03).
+    const ids: string[] = [];
     for await (const account of this.accountStorage.entries('account')) {
-      accounts.push(await this.summary(account.id));
+      ids.push(account.id);
+    }
+    const accounts: AccountSummary[] = [];
+    for (const id of ids) {
+      accounts.push(await this.summary(id));
     }
     return accounts;
   }
