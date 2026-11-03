@@ -4,38 +4,41 @@ Versions are `<stock CSS version>-<n>`: a new stock release starts at `-1`, a
 new overlay on the same stock adds one. A tag `v<version>` publishes both
 images (`.github/workflows/build.yml`).
 
-## 7.3.0-4 — 2026-11-03
+## 7.3.0-4 — unreleased
 
 On stock CSS 7.3.0. **The image's second component** (solid-kit ADR 012). An
-instance updates the image; to use it, add `ADMIN_EMAILS` to `.env`
-(`instance-template/.env.example`) and the line that passes it to
-`compose.yml` comes with the checkout.
+instance updates the image; nothing to add to `.env`.
 
-- **Admins can delete an account and its pods** (#17, slice 1). Stock CSS
-  deletes neither, so a pod name once taken stayed taken and test rounds could
-  only be cleaned by wiping the volume. `account-admin/` adds
-  `POST /.account/admin/delete-account/ { "email" }`: the pods' contents are
-  deleted through the resource store, each pod root through the data accessor
-  under the write lock (the store refuses a root storage, and a root left
-  behind keeps the name taken), then the account record with its logins,
-  WebID links and client credentials. Only accounts whose login is in
-  `ADMIN_EMAILS` may call it (`start/admins.js` writes it at start, like the
-  email sender); empty, it refuses everyone. An admin cannot delete their own
-  account there.
-- **`scripts/admin.sh delete-account <email>`**: signs in, asks for the email
-  again, calls the route, then removes the connector's agents for that
-  account from `identities.json` (new `removeIdentitiesFor` in
-  `mcp-connector/src/identityRegistry.js`).
-- Smoke (both layouts, `ADMIN_EMAILS` set in CI): a throwaway account with a
-  pod is refused to a non-admin and to nobody signed in, deleted by the admin,
-  its login no longer works, and its pod name is taken again.
+- **List every account and delete one with its pods, from the server's
+  terminal** (#17). Stock CSS does neither, so a pod name once taken stayed
+  taken and test rounds could only be cleaned by wiping the volume.
+  `scripts/admin.sh`, run from the instance's checkout, opens a TUI in the css
+  container (`admin/admin.js`): list, sort, filter, select, delete, with the
+  number of accounts typed to confirm. `list` and `delete … --yes` do the same
+  without the TUI. Docs: `docs/admin/` (tutorial, how-to, reference,
+  explanation).
+- **How it deletes** (`account-admin/`, route `POST /.account/admin/accounts/`):
+  the pods' contents go through the resource store, each pod root through the
+  data accessor under the write lock (the store refuses a root storage, and a
+  root left behind keeps the name taken), then the account record with its
+  logins, WebID links and client credentials.
+- **Who may: whoever runs a command on the server.** `start/admins.js` writes a
+  fresh random token at every start, readable by the container only; the tool
+  reads it there. The first draft listed admin login emails (`ADMIN_EMAILS`),
+  never released: CSS does not verify a login's email, so a listed address
+  nobody had used yet made whoever signed up with it first an admin.
+- **The connector's agents** for a deleted account are removed from
+  `identities.json` by `scripts/admin.sh` (new `removeIdentitiesFor`).
+- **Gateway templates** answer 404 for `/.account/admin/` from outside. An
+  existing gateway does not need it (the token protects the route), but add it
+  when you next touch the vhost.
 - **An instance that mounts its own copy of `config/instance.json`** (more
   reserved names, overlay-template) adds one line to its `import` list, after
-  the email one, or the route answers 404:
+  the email one, or the tool answers 404:
   `"css:config/identity/handler/account-admin.json",`
-- **List only emails that are already logins on the server**: stock CSS does
-  not verify a login's email, so an unclaimed address listed in
-  `ADMIN_EMAILS` makes whoever signs up with it first an admin.
+- Smoke (both layouts): a throwaway account with a pod is listed by the tool
+  run inside the container and deleted by it. Its login no longer works, its
+  pod name is taken again, and a guessed token from outside is refused.
 
 ## 7.3.0-3 — 2026-11-03
 

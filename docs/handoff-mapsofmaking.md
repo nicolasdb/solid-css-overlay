@@ -10,7 +10,7 @@ particular to Maps of Making.
 | | |
 |---|---|
 | Server address (`CSS_BASE_URL`) | `https://pod.mapsofmaking.org/` |
-| Test pod | `nicolas-test` → `https://nicolas-test.pod.mapsofmaking.org/`, a throwaway. `openfab-bxl` waited until accounts could be deleted: from 7.3.0-4 an admin can (`scripts/admin.sh`), so test accounts can be cleaned before OpenFab's goes in |
+| Test pod | `nicolas-test` → `https://nicolas-test.pod.mapsofmaking.org/`, a throwaway. `openfab-bxl` waited until accounts could be deleted: from 7.3.0-4 the server's terminal can (`scripts/admin.sh`), so test accounts can be cleaned before OpenFab's goes in |
 | Connector (`MCP_PUBLIC_BASE`) | `https://mcp.pod.mapsofmaking.org/` |
 | `MCP_ALLOWED_HOSTS` | `mcp.pod.mapsofmaking.org,pod.mapsofmaking.org` (the second is for `/onboard/`) |
 | `INSTANCE_NAME` | `mom-pods`: containers `mom-pods-css` and `mom-pods-mcp-connector`, volume `mom-pods_css-data`. One checkout per function, prefix `mom-` |
@@ -283,12 +283,11 @@ only while the instance holds test accounts only.
 
 ## Next, not now
 
-- **OpenFab's account and `openfab-bxl`**: unblocked by 7.3.0-4 (admins
-  delete accounts, `ROADMAP.md`). On update: set `ADMIN_EMAILS` to Nicolas's
-  existing login in `.env`; if `pods/instance.json` is mounted, add the
-  account-admin import (CHANGELOG 7.3.0-4); then `scripts/admin.sh
-  delete-account` cleans the test accounts one by one. A `make` target for
-  it belongs in vps-infra.
+- **OpenFab's account and `openfab-bxl`**: unblocked by 7.3.0-4 (account
+  admin, `docs/admin/how-to.md`). On update: if `pods/instance.json` is
+  mounted, add the account-admin import (CHANGELOG 7.3.0-4); then
+  `scripts/admin.sh` lists the test accounts and deletes them. A `make`
+  target for it belongs in vps-infra.
 
 - **Backups of the `mom-pods_css-data` volume**: it holds every account
   and pod. This install does not set them up.

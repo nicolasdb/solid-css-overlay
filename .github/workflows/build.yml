@@ -76,7 +76,7 @@ jobs:
         run: npm ci && /usr/bin/google-chrome --version
 
       - name: smoke, subdomain pods (the image's default)
-        env: { POD_LAYOUT: subdomain, TRY_NETWORK: host, CHROMIUM_PATH: /usr/bin/google-chrome, ADMIN_EMAILS: smoke-admin@example.org }
+        env: { POD_LAYOUT: subdomain, TRY_NETWORK: host, CHROMIUM_PATH: /usr/bin/google-chrome }
         run: |
           test/try-local.sh 3123
           node test/smoke.mjs http://localhost:3123 test/shots/subdomain
@@ -84,7 +84,7 @@ jobs:
           docker rm -f try-css-overlay-3123
 
       - name: smoke, folder pods (config/suffix.json)
-        env: { POD_LAYOUT: suffix, TRY_NETWORK: host, CHROMIUM_PATH: /usr/bin/google-chrome, ADMIN_EMAILS: smoke-admin@example.org }
+        env: { POD_LAYOUT: suffix, TRY_NETWORK: host, CHROMIUM_PATH: /usr/bin/google-chrome }
         run: |
           test/try-local.sh 3124
           node test/smoke.mjs http://localhost:3124 test/shots/suffix

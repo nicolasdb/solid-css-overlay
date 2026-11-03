@@ -5,7 +5,7 @@
 #
 # Nothing in CSS is patched. The image only adds files where stock CSS already
 # looks for them (templates/), one config, and two components (PodNameGuard,
-# and AdminDeleteAccountHandler: solid-kit ADR 012).
+# and AccountAdminHandler: solid-kit ADR 012) with its terminal tool (admin/).
 ARG CSS_VERSION=7.3.0
 
 # PodNameGuard, built and tested in the stock image it will run in, so on the
@@ -76,11 +76,14 @@ ENV CSS_CONFIG=/config/instance.json
 
 # What this instance offers (/.well-known/css/provider.json), its pod layout
 # for the pages, its email sender (config/identity/email/overlay.json) and its
-# admin route (config/identity/handler/account-admin.json), both imported by
-# both configs, written at every start from the environment, then the stock
+# account admin route and its token (config/identity/handler/account-admin.json),
+# both imported by both configs, written at every start from the environment, then the stock
 # server. The version is the tag (the publish job passes it); local builds say dev.
 ARG OVERLAY_VERSION=dev
 ENV OVERLAY_VERSION=${OVERLAY_VERSION}
 COPY start/describe.js start/email.js start/admins.js start/welcome.js start/start.sh /opt/overlay/
+# The account admin's terminal tool, run with `docker compose exec css node
+# /opt/overlay/admin.js` (scripts/admin.sh does it). Not an entrypoint step.
+COPY admin/admin.js /opt/overlay/admin.js
 ENTRYPOINT ["/opt/overlay/start.sh"]
 # CSS_BASE_URL is the instance's (compose .env); CSS_ROOT_FILE_PATH=/data is stock.

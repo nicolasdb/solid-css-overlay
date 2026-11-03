@@ -1,29 +1,24 @@
-// Runs before the server, on every start (start/start.sh): writes the admin
-// route of account-admin/ (solid-kit ADR 012) with this instance's admins.
-// Stock CSS cannot delete an account or a pod; this route can, for the login
-// emails listed in ADMIN_EMAILS (comma-separated, from the instance's .env).
-// Written here rather than in config/ for the reason start/email.js gives: an
-// instance never edits the config, so what differs per instance comes from
-// its environment at start.
+// Runs before the server, on every start (start/start.sh): writes the account
+// admin route of account-admin/ (solid-kit ADR 012) with a fresh random token,
+// and the same token in a file only the container's user can read. Stock CSS
+// cannot list every account nor delete one; this route can, for whoever sends
+// the token, which is whoever can run a command in this container: the
+// admin TUI (admin/admin.js, `scripts/admin.sh` from the instance's checkout).
 //
-// Stock CSS does not verify the email of a password login. An address listed
-// here that is not yet a login on this server belongs to whoever signs up
-// with it first, and makes them admin: list only addresses already in use
-// (.env.example says so to the instance).
+// Why a token and not a list of admin emails (the first draft of 7.3.0-4):
+// stock CSS never verifies a login's email, so a listed address nobody had
+// signed up with yet made whoever took it first an admin. Who may delete an
+// account is who runs the server, and ssh already says that.
 //
-// ADMIN_EMAILS empty or unset: the route is still there and refuses everyone
-// (403). Unlike a broken SMTP setting, that does not stop the start: no admin
-// is the safe default, and an instance with no admin today is a normal one.
-//
-// The route: POST /.account/admin/delete-account/ { "email": "..." }, signed
-// in to the account API. scripts/admin.sh is its front door.
+// A new token at every start: nothing to rotate, nothing stored in the data
+// volume, nothing to put in .env. Both files live in the container's own
+// filesystem and go with it.
+const crypto = require("crypto");
 const fs = require("fs");
 
 const out = "config/identity/handler/account-admin.json";
-const admins = (process.env.ADMIN_EMAILS || "")
-  .split(",")
-  .map((email) => email.trim().toLowerCase())
-  .filter(Boolean);
+const tokenFile = "config/identity/handler/account-admin.token";
+const token = crypto.randomBytes(32).toString("base64url");
 
 const config = {
   "@context": [
@@ -32,21 +27,21 @@ const config = {
   ],
   "@graph": [
     {
-      comment: "Written by start/admins.js at every start. account-admin/src/AdminDeleteAccountHandler.ts says why each piece is used.",
-      "@id": "urn:solid-server:overlay:AdminDeleteAccountRouter",
+      comment: "Written by start/admins.js at every start. account-admin/src/AccountAdminHandler.ts says why each piece is used.",
+      "@id": "urn:solid-server:overlay:AccountAdminRouter",
       "@type": "InteractionRouteHandler",
       route: {
-        "@id": "urn:solid-server:overlay:AdminDeleteAccountRoute",
+        "@id": "urn:solid-server:overlay:AccountAdminRoute",
         "@type": "RelativePathInteractionRoute",
         base: { "@id": "urn:solid-server:default:IndexRoute" },
-        relativePath: "admin/delete-account/",
+        relativePath: "admin/accounts/",
       },
       source: {
         "@type": "MethodFilterHandler",
         methods: ["POST"],
         source: {
-          "@id": "urn:solid-server:overlay:AdminDeleteAccountHandler",
-          "@type": "AdminDeleteAccountHandler",
+          "@id": "urn:solid-server:overlay:AccountAdminHandler",
+          "@type": "AccountAdminHandler",
           accountStorage: { "@id": "urn:solid-server:default:AccountStorage" },
           passwordStore: { "@id": "urn:solid-server:default:PasswordStore" },
           podStore: { "@id": "urn:solid-server:default:PodStore" },
@@ -57,21 +52,21 @@ const config = {
           accessor: { "@id": "urn:solid-server:default:FileDataAccessor" },
           auxiliaryStrategy: { "@id": "urn:solid-server:default:AuxiliaryStrategy" },
           locker: { "@id": "urn:solid-server:default:ResourceLocker" },
-          admins,
+          token,
         },
       },
     },
     {
       "@id": "urn:solid-server:default:InteractionRouteHandler",
       "@type": "WaterfallHandler",
-      handlers: [{ "@id": "urn:solid-server:overlay:AdminDeleteAccountRouter" }],
+      handlers: [{ "@id": "urn:solid-server:overlay:AccountAdminRouter" }],
     },
   ],
 };
 
 fs.writeFileSync(out, JSON.stringify(config, null, 2) + "\n", { mode: 0o600 });
-console.log(
-  admins.length
-    ? `[solid-css-overlay] admins: ${admins.length} (account deletion open to them)`
-    : "[solid-css-overlay] admins: none (ADMIN_EMAILS unset), account deletion refused to everyone"
-);
+fs.writeFileSync(tokenFile, token + "\n", { mode: 0o600 });
+// writeFileSync keeps the mode of a file that already exists: set it again.
+fs.chmodSync(out, 0o600);
+fs.chmodSync(tokenFile, 0o600);
+console.log("[solid-css-overlay] account admin: route ready, token renewed (scripts/admin.sh on the server)");

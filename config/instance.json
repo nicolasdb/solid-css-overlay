@@ -57,9 +57,10 @@
         "   the instance's SMTP_* variables (instance-template/email.env): stock BaseEmailSender when they are",
         "   set, stock default.json's 'No email server is configured.' when not. Stock default.json gave no",
         "   way to reset a password.",
-        "5. Admins can delete an account and its pods (stock CSS cannot): identity/handler/account-admin.json,",
-        "   written at every start by start/admins.js from ADMIN_EMAILS, route /.account/admin/delete-account/",
-        "   (account-admin/ in this repo, solid-kit ADR 012). No ADMIN_EMAILS: the route refuses everyone."
+        "5. Accounts can be listed and deleted from the server's own terminal (stock CSS cannot):",
+        "   identity/handler/account-admin.json, written at every start by start/admins.js with a fresh token",
+        "   only the container can read. Route /.account/admin/accounts/; tool scripts/admin.sh (account-admin/",
+        "   and admin/ in this repo, solid-kit ADR 012)."
       ]
     },
     {
