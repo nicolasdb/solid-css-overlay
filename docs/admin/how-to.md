@@ -66,3 +66,5 @@ by itself after 30 minutes.
 | `admin: 403 …` | the token did not match. Restart the css container: it writes a new one |
 | `stopped at <email>: …` | the deletion failed partway. That account is still there; run it again |
 | `the TUI needs a terminal` | run it from an ssh session, not through a pipe |
+| in the server log, `Error deleting auxiliary resource …/<file>/.internal/: ENOTDIR` | harmless. CSS looks for a companion entry each document never had, says so, and goes on; the pod is deleted all the same (seen on Maps of Making, pods written by mom-home) |
+| a deleted pod's address answers 401, not 404 | normal: CSS answers a visitor the same for a name that never existed, so it does not tell whether a pod was there |

@@ -4,7 +4,7 @@ Versions are `<stock CSS version>-<n>`: a new stock release starts at `-1`, a
 new overlay on the same stock adds one. A tag `v<version>` publishes both
 images (`.github/workflows/build.yml`).
 
-## 7.3.0-4 — unreleased
+## 7.3.0-4 — 2026-11-03
 
 On stock CSS 7.3.0. **The image's second component** (solid-kit ADR 012). An
 instance updates the image; nothing to add to `.env`.
@@ -36,6 +36,9 @@ instance updates the image; nothing to add to `.env`.
   reserved names, overlay-template) adds one line to its `import` list, after
   the email one, or the tool answers 404:
   `"css:config/identity/handler/account-admin.json",`
+- **Tried end to end on Maps of Making** (as 7.3.0-4-rc.1): 9 test accounts
+  listed and deleted from the TUI over ssh. The server stayed healthy, and the
+  deleted pods now answer like names that never existed.
 - Smoke (both layouts): a throwaway account with a pod is listed by the tool
   run inside the container and deleted by it. Its login no longer works, its
   pod name is taken again, and a guessed token from outside is refused.
