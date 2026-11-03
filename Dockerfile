@@ -5,10 +5,10 @@
 #
 # Nothing in CSS is patched. The image only adds files where stock CSS already
 # looks for them (templates/), one config, and one component (PodNameGuard).
-ARG CSS_VERSION=7.2.0
+ARG CSS_VERSION=7.3.0
 
 # PodNameGuard, built and tested in the stock image it will run in, so on the
-# same Node: 18 for CSS 7.x, 22 for 8.0. Until 7.2.0-5 this stage was a pinned
+# same Node: 18 for CSS 7.0-7.2, 24 from 7.3.0, 22 for 8.0. Until 7.2.0-5 this stage was a pinned
 # node:18-slim, which would have kept testing on 18 after the move to 8.0 (and
 # 18 is past end of life). The stage only builds; nothing of it but the built
 # component reaches the final image.

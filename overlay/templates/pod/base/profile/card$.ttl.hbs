@@ -1,0 +1,26 @@
+{{!--
+  Override of CSS 7.3.0 pod/base/profile/card$.ttl.hbs (upstream-baseline.sha256).
+  Kept from stock: every statement, in the same order and with the same conditions.
+  Added: the two discovery links every Solid app looks for (solid:publicTypeIndex,
+  pim:preferencesFile, whose file names the private Type Index), so a new pod is
+  findable by type from day one and apps never need to write the profile to add
+  them (Maps of Making home, decision 2026-11-03). CSS 7.3's WebID recovery
+  regenerates the profile from this template: a repaired profile keeps the links.
+  This comment does not reach the pod.
+--}}
+@prefix foaf: <http://xmlns.com/foaf/0.1/>.
+@prefix solid: <http://www.w3.org/ns/solid/terms#>.
+@prefix pim: <http://www.w3.org/ns/pim/space#>.
+
+<>
+    a foaf:PersonalProfileDocument;
+    foaf:maker <{{webId}}>;
+    foaf:primaryTopic <{{webId}}>.
+
+<{{webId}}>
+    {{#if name}}foaf:name "{{name}}";{{/if}}
+    {{#if oidcIssuer}}solid:oidcIssuer <{{oidcIssuer}}>;{{/if}}
+    {{#if linkStorage}}pim:storage <{{base.path}}>;{{/if}}
+    {{#if linkStorage}}solid:publicTypeIndex <{{base.path}}settings/publicTypeIndex.ttl>;{{/if}}
+    {{#if linkStorage}}pim:preferencesFile <{{base.path}}settings/prefs.ttl>;{{/if}}
+    a foaf:Person.

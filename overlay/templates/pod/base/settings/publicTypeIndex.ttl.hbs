@@ -1,0 +1,9 @@
+{{!--
+  The public Type Index: where apps find what this pod makes findable, by type
+  (a space file, later a network's config). Readable by anyone
+  (wac/settings/publicTypeIndex.ttl.acl.hbs): list only what is public anyway.
+  Linked from the profile (profile/card). Starts empty; apps add their own entries.
+--}}
+@prefix solid: <http://www.w3.org/ns/solid/terms#>.
+
+<> a solid:TypeIndex, solid:ListedDocument.

@@ -1,4 +1,4 @@
-<%# Override of CSS 7.2.0 identity/account/resource.html.ejs (upstream-baseline.sha256).
+<%# Override of CSS 7.3.0 identity/account/resource.html.ejs (upstream-baseline.sha256).
     Kept from stock: every id and the whole script, but for two labels it sets
     ("Change" for "(update)", "Remove" for util.js's "(delete)").
     Changed: copy, an intro line, and the order — pods and WebIDs first, each
@@ -20,6 +20,7 @@
   </p>
   <ul id="webIdEntries"></ul>
   <a id="linkWebId" href="" class="link">Link a WebID from elsewhere</a>
+  <a id="recoverWebId" href="" class="link">Repair a WebID in one of your pods</a>
 </div>
 <div id="passwordLogins">
   <h2>How you log in</h2>
@@ -79,6 +80,12 @@
       setVisibility('webIds', false);
     } else {
       updateElement('linkWebId', controls.html.account.linkWebId, { href: true });
+      // CSS 7.3.0 (stock, kept): only shown when the server can recover a WebID from its pods.
+      if (controls.html.account.recoverWebId) {
+        updateElement('recoverWebId', controls.html.account.recoverWebId, { href: true });
+      } else {
+        setVisibility('recoverWebId', false);
+      }
       showAccountInfo(elements.webIdEntries, webIdLinks, false, true,
         'Are you sure you want to delete the registration of this WebID? ' +
         'If you do so you will be unable to identify as this WebID using this server, which can potentially cause you to lose access to data restricted to this WebID.',

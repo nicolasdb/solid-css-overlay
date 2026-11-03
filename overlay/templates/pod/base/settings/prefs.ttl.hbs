@@ -1,0 +1,10 @@
+{{!--
+  The preferences file (pim:preferencesFile in the profile): private, it names
+  the private Type Index so its address is not published in the profile.
+--}}
+@prefix pim: <http://www.w3.org/ns/pim/space#>.
+@prefix solid: <http://www.w3.org/ns/solid/terms#>.
+
+<> a pim:ConfigurationFile.
+
+<{{webId}}> solid:privateTypeIndex <./privateTypeIndex.ttl>.

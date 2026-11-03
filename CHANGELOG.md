@@ -4,6 +4,31 @@ Versions are `<stock CSS version>-<n>`: a new stock release starts at `-1`, a
 new overlay on the same stock adds one. A tag `v<version>` publishes both
 images (`.github/workflows/build.yml`).
 
+## 7.3.0-1 — 2026-11-03
+
+Stock CSS 7.3.0 (#30). An instance updates the image; nothing to change in
+`.env` but the version. Pods made before keep what they have: the new pod
+files below come with pods made from this image on.
+
+- **CSS 7.3.0.** Runs on Node 24 (the guard is built and tested in the stock
+  image, so it moved with it). Upstream changes that matter to instances:
+  pod quota now works in subdomain mode (was silently unlimited), write locks
+  hold while a request body is still arriving, and **a WebID's profile can be
+  repaired** from the account (`recoverWebId`): it is regenerated from the pod
+  templates, the old one backed up beside it.
+- **Merged into the overlay:** the consent page's "repair it first" line and the
+  account page's "Repair a WebID in one of your pods" link (stock ids kept,
+  hidden when the server can't repair), set apart from the main choice.
+- **New pods are findable by type.** A new pod starts with a public Type Index
+  (`settings/publicTypeIndex.ttl`, readable by anyone), a private one
+  (`settings/privateTypeIndex.ttl`) and a preferences file (`settings/prefs.ttl`,
+  naming the private index), all private but the public index. The profile
+  (`pod/base/profile/card$.ttl.hbs`, now an override, in the baseline) links the
+  public index and the preferences file, so apps never have to write the
+  profile to add them; a profile repaired by 7.3's recovery keeps the links.
+  Both layouts, WAC and ACP. Asked by Maps of Making home (mom-home#14,
+  decision 2026-11-03).
+
 ## 7.2.0-13 — 2026-11-02
 
 An instance updates the image; nothing to change in `.env` but the version.
