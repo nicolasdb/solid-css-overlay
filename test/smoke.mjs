@@ -168,6 +168,43 @@ const again = await desk.newPage();
 await toConsent(again);
 check((await again.$eval("#webIdList input:checked", (i) => i.value).catch(() => null)) === chosen, "consent: the last WebID chosen is pre-selected");
 
+// The account's agents apart (issue #25). An agent WebID in the account's own
+// pod links without an ownership check (CSS: the account made that pod). The
+// person's card is what says it is an agent: the connector writes
+// `<card#me> acl:delegates <agent#me>`, here added to the served card by the
+// browser, as this run has no Solid session to write the card with.
+const card = `${podUrl("nicolas")}profile/card#me`;
+const agentId = `${podUrl("nicolas")}profile/agent#me`;
+const accountControls = (await (await page.request.get(`${base}/.account/`, { headers: { accept: "application/json" } })).json()).controls;
+const linked = await page.request.post(accountControls.account.webId, { data: { webId: agentId } });
+check(linked.ok(), `consent: an agent WebID links to the account (${linked.status()})`);
+const delegating = async (route) => {
+  const res = await route.fetch();
+  const body = (await res.text()) + `\n<${card}> <http://www.w3.org/ns/auth/acl#delegates> <${agentId}> .\n`;
+  await route.fulfill({ response: res, body });
+};
+const withAgent = await desk.newPage();
+await withAgent.route(card.replace(/#.*/, ""), delegating);
+await toConsent(withAgent);
+const placed = await withAgent.evaluate((a) => ({
+  inMain: [...document.querySelectorAll("#webIdList input")].some((i) => i.value === a),
+  inAgents: [...document.querySelectorAll("#agentList input")].some((i) => i.value === a),
+  open: document.getElementById("agents").open,
+  hidden: document.getElementById("agents").hidden,
+}), agentId);
+check(placed.inAgents && !placed.inMain && !placed.hidden && !placed.open, `consent: an agent is listed apart, closed (${JSON.stringify(placed)})`);
+check(await withAgent.$$eval("#webIdList input", (is, c) => is.some((i) => i.value === c), card), "consent: the person's own card stays in the main list");
+await withAgent.click("#agents summary");
+await shot(withAgent, "06c-consent-agents");
+await withAgent.close();
+// No profile readable: nothing is moved, the agent is listed as before.
+const blind = await desk.newPage();
+await blind.route(card.replace(/#.*/, ""), (route) => route.abort());
+await toConsent(blind);
+check(await blind.$$eval("#webIdList input", (is, a) => is.some((i) => i.value === a), agentId) && (await blind.$eval("#agents", (d) => d.hidden)),
+  "consent: an unreadable card hides nothing");
+await blind.close();
+
 // An app with a Client ID Document: the server fetched it and sends the sign-in
 // only to its redirect URIs, so the page names the document's host. Served
 // here, on the machine running the smoke run; the server must reach it, which
