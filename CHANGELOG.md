@@ -4,10 +4,11 @@ Versions are `<stock CSS version>-<n>`: a new stock release starts at `-1`, a
 new overlay on the same stock adds one. A tag `v<version>` publishes both
 images (`.github/workflows/build.yml`).
 
-## 7.3.0-2 — 2026-11-03
+## 7.3.0-3 — 2026-11-03
 
 Overlay only, on stock CSS 7.3.0. An instance updates the image; nothing to
-change in `.env` but the version.
+change in `.env` but the version. 7.3.0-2 was tagged before this change
+reached main: an instance can go straight from 7.3.0-1 to 7.3.0-3.
 
 - **New pods' profiles carry `pim:storage` and the Type Index links, for real.**
   7.3.0-1 put the two Type Index links under stock's `linkStorage` condition,
@@ -18,6 +19,12 @@ change in `.env` but the version.
   storage. Smoke: a fresh pod's profile, read straight from the account flow,
   carries all three, and its public index reads without signing in. Pods made
   under 7.3.0-1 keep their profiles (apps patch the links in).
+
+## 7.3.0-2 — 2026-11-03
+
+Overlay only, on stock CSS 7.3.0. An instance updates the image; nothing to
+change in `.env` but the version.
+
 - **Consent keeps the account's agents apart** (#25). A WebID that another
   WebID of the account declares as its agent (`acl:delegates` in its public
   profile, as the MCP connector writes it) moves to a closed "Your agents"
