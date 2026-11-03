@@ -297,15 +297,24 @@ if (adminEmail) {
   const api = async (url, { token, data, method } = {}) => {
     const res = await fetch(url, {
       method: method || (data === undefined ? "GET" : "POST"),
+      // No content-type on a GET: CSS then parses the empty body as JSON and
+      // answers 400 without controls (first CI run of 7.3.0-4).
       headers: {
-        accept: "application/json", "content-type": "application/json",
+        accept: "application/json",
+        ...(data === undefined ? {} : { "content-type": "application/json" }),
         ...(token ? { authorization: `CSS-Account-Token ${token}` } : {}),
       },
       body: data === undefined ? undefined : JSON.stringify(data),
     });
     return { status: res.status, json: await res.json().catch(() => ({})) };
   };
-  const controlsFor = async (token) => (await api(`${base}/.account/`, { token })).json.controls;
+  const controlsFor = async (token) => {
+    const { status, json } = await api(`${base}/.account/`, { token });
+    if (!json.controls) {
+      throw new Error(`delete account: GET /.account/ gave no controls (${status} ${JSON.stringify(json).slice(0, 200)})`);
+    }
+    return json.controls;
+  };
   // Account, password login, and optionally a pod: what the register page does.
   const signUp = async (who, podName) => {
     const { json: { authorization: token } } = await api((await controlsFor()).account.create, { data: {} });
