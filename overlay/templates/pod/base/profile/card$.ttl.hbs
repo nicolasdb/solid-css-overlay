@@ -1,11 +1,17 @@
 {{!--
   Override of CSS 7.3.0 pod/base/profile/card$.ttl.hbs (upstream-baseline.sha256).
-  Kept from stock: every statement, in the same order and with the same conditions.
+  Kept from stock: every statement, in the same order.
+  Changed: pim:storage is always written. Stock writes it only when the pod
+  settings say `linkStorage`, which nothing in CSS 7.3.0 sets, so stock never
+  writes it; here a WebID always lives in its own pod, and pim:storage is how
+  apps find a WebID's storage (7.3.0-2).
   Added: the two discovery links every Solid app looks for (solid:publicTypeIndex,
   pim:preferencesFile, whose file names the private Type Index), so a new pod is
   findable by type from day one and apps never need to write the profile to add
-  them (Maps of Making home, decision 2026-11-03). CSS 7.3's WebID recovery
-  regenerates the profile from this template: a repaired profile keeps the links.
+  them (Maps of Making home, decision 2026-11-03). In 7.3.0-1 they sat under the
+  same `linkStorage` condition, so no pod got them (apps patched them in).
+  CSS 7.3's WebID recovery regenerates the profile from this template: a
+  repaired profile keeps all three lines.
   This comment does not reach the pod.
 --}}
 @prefix foaf: <http://xmlns.com/foaf/0.1/>.
@@ -20,7 +26,7 @@
 <{{webId}}>
     {{#if name}}foaf:name "{{name}}";{{/if}}
     {{#if oidcIssuer}}solid:oidcIssuer <{{oidcIssuer}}>;{{/if}}
-    {{#if linkStorage}}pim:storage <{{base.path}}>;{{/if}}
-    {{#if linkStorage}}solid:publicTypeIndex <{{base.path}}settings/publicTypeIndex.ttl>;{{/if}}
-    {{#if linkStorage}}pim:preferencesFile <{{base.path}}settings/prefs.ttl>;{{/if}}
+    pim:storage <{{base.path}}>;
+    solid:publicTypeIndex <{{base.path}}settings/publicTypeIndex.ttl>;
+    pim:preferencesFile <{{base.path}}settings/prefs.ttl>;
     a foaf:Person.

@@ -110,6 +110,16 @@ const root = await page.evaluate(async (url) => {
 }, podUrl("atelier"));
 check(root.status === 200 && /turtle/.test(root.type) && /pim\/space#Storage>; rel="type"/.test(root.link),
   `pod root: ${podUrl("atelier")} answers Turtle and pim:Storage (${root.status} ${root.type})`);
+// A new pod's profile, straight from the account flow (no app has touched it):
+// pim:storage and the two Type Index links come from the template itself.
+// 7.3.0-1 put them under stock's `linkStorage`, which nothing sets: no pod got
+// them, and only a profile read like this one shows it.
+const newCard = await page.evaluate(async (url) => (await fetch(url, { headers: { accept: "text/turtle" } })).text(), `${podUrl("atelier")}profile/card`);
+for (const [what, re] of [["pim:storage", /storage> <[^>]+>|pim:storage </], ["solid:publicTypeIndex", /publicTypeIndex/], ["pim:preferencesFile", /preferencesFile/]]) {
+  check(re.test(newCard), `new pod profile: ${what} from the template`);
+}
+const index = await page.evaluate(async (url) => (await fetch(url, { headers: { accept: "text/turtle" }, credentials: "omit" })).status, `${podUrl("atelier")}settings/publicTypeIndex.ttl`);
+check(index === 200, `new pod: the public Type Index reads without signing in (${index})`);
 await page.waitForFunction(() => document.querySelectorAll("#podEntries li").length >= 2);
 await shot(page, "03-account");
 

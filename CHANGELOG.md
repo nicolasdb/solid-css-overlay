@@ -9,6 +9,15 @@ images (`.github/workflows/build.yml`).
 Overlay only, on stock CSS 7.3.0. An instance updates the image; nothing to
 change in `.env` but the version.
 
+- **New pods' profiles carry `pim:storage` and the Type Index links, for real.**
+  7.3.0-1 put the two Type Index links under stock's `linkStorage` condition,
+  which nothing in CSS 7.3.0 sets: no pod got them (Maps of Making home added
+  them itself, insert-only). Stock never writes `pim:storage` for the same
+  reason. The profile template now writes all three unconditionally: a WebID
+  made here always lives in its own pod, and `pim:storage` is how apps find its
+  storage. Smoke: a fresh pod's profile, read straight from the account flow,
+  carries all three, and its public index reads without signing in. Pods made
+  under 7.3.0-1 keep their profiles (apps patch the links in).
 - **Consent keeps the account's agents apart** (#25). A WebID that another
   WebID of the account declares as its agent (`acl:delegates` in its public
   profile, as the MCP connector writes it) moves to a closed "Your agents"
