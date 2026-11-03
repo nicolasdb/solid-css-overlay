@@ -296,8 +296,19 @@ await shot(w, "12-forgot");
 // token is sent. Account API calls go to the bare domain, which node reaches.
 {
   const container = process.env.SMOKE_CONTAINER || `try-css-overlay-${new URL(base).port}`;
-  const admin = (...args) => JSON.parse(execFileSync(process.env.DOCKER || "docker",
-    ["exec", container, "node", "/opt/overlay/admin.js", ...args, "--json"], { encoding: "utf-8" }));
+  const docker = process.env.DOCKER || "docker";
+  const admin = (...args) => {
+    try {
+      return JSON.parse(execFileSync(docker, ["exec", container, "node", "/opt/overlay/admin.js", ...args, "--json"],
+        { encoding: "utf-8", timeout: 60000 }));
+    } catch (error) {
+      // What the server said is the only clue when the tool dies without a word.
+      let logs = "";
+      try { logs = execFileSync(docker, ["logs", "--tail", "60", container], { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] }); } catch (e) { logs = `${e.stdout || ""}${e.stderr || ""}` || e.message; }
+      console.log(`--- admin.js ${args.join(" ")} failed (${error.status ?? error.signal}): ${error.stderr || error.message}\n--- server log:\n${logs}`);
+      throw error;
+    }
+  };
   const api = async (url, { token, data } = {}) => {
     const res = await fetch(url, {
       method: data === undefined ? "GET" : "POST",
