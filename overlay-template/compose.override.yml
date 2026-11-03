@@ -36,5 +36,7 @@ services:
       # Compose). Pods made before keep theirs.
       # - ${DESIGN_SYSTEM:?set DESIGN_SYSTEM in .env}/pods/pod/README.md.hbs:/community-server/templates/pod/base/README$$.md.hbs:ro
       # More reserved pod names than the image's: a copy of config/instance.json.
+      # Keep its import list in step with the image's at each update (7.3.0-4
+      # added identity/handler/account-admin.json: without it, no admin route).
       # - ${DESIGN_SYSTEM:?set DESIGN_SYSTEM in .env}/pods/instance.json:/config/instance.json:ro
       []

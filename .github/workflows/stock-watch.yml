@@ -31,7 +31,7 @@ jobs:
           gh issue create --title "$title" --body "$(printf '%s\n' \
             "1. \`docker pull solidproject/community-server:$latest\`" \
             "2. \`scripts/check-overrides.sh solidproject/community-server:$latest\`: merge every template it flags into overlay/, then \`--rebaseline\`." \
-            "3. \`ARG CSS_VERSION=$latest\` in the Dockerfile, \`@solid/community-server\` in pod-name-guard/package.json; rebuild, smoke both layouts." \
+            "3. \`ARG CSS_VERSION=$latest\` in the Dockerfile, \`@solid/community-server\` in pod-name-guard/package.json and account-admin/package.json; rebuild, smoke both layouts." \
             "4. CHANGELOG \`## $latest-1\`, tag \`v$latest-1\`.")"
 
   # Ahead of a release: the overlay built on stock's unreleased images, with
@@ -78,7 +78,7 @@ jobs:
         id: smoke_subdomain
         if: steps.build.outcome == 'success'
         continue-on-error: true
-        env: { POD_LAYOUT: subdomain, TRY_NETWORK: host, IMAGE: "solid-css-overlay:${{ matrix.tag }}" }
+        env: { POD_LAYOUT: subdomain, TRY_NETWORK: host, ADMIN_EMAILS: smoke-admin@example.org, IMAGE: "solid-css-overlay:${{ matrix.tag }}" }
         run: |
           test/try-local.sh 3123
           node test/smoke.mjs http://localhost:3123 "test/shots/$TAG-subdomain"
@@ -86,7 +86,7 @@ jobs:
         id: smoke_suffix
         if: steps.build.outcome == 'success'
         continue-on-error: true
-        env: { POD_LAYOUT: suffix, TRY_NETWORK: host, IMAGE: "solid-css-overlay:${{ matrix.tag }}" }
+        env: { POD_LAYOUT: suffix, TRY_NETWORK: host, ADMIN_EMAILS: smoke-admin@example.org, IMAGE: "solid-css-overlay:${{ matrix.tag }}" }
         run: |
           docker rm -f try-css-overlay-3123 >/dev/null 2>&1 || true
           test/try-local.sh 3124

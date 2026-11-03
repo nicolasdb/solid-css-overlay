@@ -34,6 +34,11 @@ services:
       # create accounts (ADR 010 amendment, points 8-11). Set it only once the
       # gateway rate-limits /.account/.
       - OPEN_REGISTRATION=${OPEN_REGISTRATION:-}
+      # Login emails that may delete any account and its pods (comma-separated;
+      # solid-kit ADR 012, scripts/admin.sh). Empty: nobody can (start/admins.js).
+      # Only emails that are already logins here: CSS does not verify an email,
+      # so an unclaimed one goes to whoever signs up with it first.
+      - ADMIN_EMAILS=${ADMIN_EMAILS:-}
     # The email sender, so "Forgot your password?" sends its link: SMTP_HOST,
     # SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM (email.env.example). Its own
     # git-ignored file, not .env, because it holds a password; absent, the

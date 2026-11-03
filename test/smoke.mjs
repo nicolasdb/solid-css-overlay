@@ -286,6 +286,70 @@ await w.goto(`${base}/.account/login/password/forgot/`);
 await submitReady(w);
 await shot(w, "12-forgot");
 
+// Account deletion by an admin (account-admin/, solid-kit ADR 012). Stock CSS
+// deletes no account and no pod, so a pod name once taken stayed taken and
+// every test round burned names. The gate: an account with a pod is deleted,
+// and the same pod name can be taken again (a pod root left behind answers
+// 409). Through the JSON API from node: the account API is on the bare
+// domain. Runs when try-local.sh got ADMIN_EMAILS (CI sets it).
+const adminEmail = (process.env.ADMIN_EMAILS || "").split(",")[0].trim();
+if (adminEmail) {
+  const api = async (url, { token, data, method } = {}) => {
+    const res = await fetch(url, {
+      method: method || (data === undefined ? "GET" : "POST"),
+      // No content-type on a GET: CSS then parses the empty body as JSON and
+      // answers 400 without controls (first CI run of 7.3.0-4).
+      headers: {
+        accept: "application/json",
+        ...(data === undefined ? {} : { "content-type": "application/json" }),
+        ...(token ? { authorization: `CSS-Account-Token ${token}` } : {}),
+      },
+      body: data === undefined ? undefined : JSON.stringify(data),
+    });
+    return { status: res.status, json: await res.json().catch(() => ({})) };
+  };
+  const controlsFor = async (token) => {
+    const { status, json } = await api(`${base}/.account/`, { token });
+    if (!json.controls) {
+      throw new Error(`delete account: GET /.account/ gave no controls (${status} ${JSON.stringify(json).slice(0, 200)})`);
+    }
+    return json.controls;
+  };
+  // Account, password login, and optionally a pod: what the register page does.
+  const signUp = async (who, podName) => {
+    const { json: { authorization: token } } = await api((await controlsFor()).account.create, { data: {} });
+    check(Boolean(token), `delete account: the JSON API makes an account for ${who} (an authorization token)`);
+    const controls = await controlsFor(token);
+    await api(controls.password.create, { token, data: { email: who, password } });
+    const pod = podName ? await api(controls.account.pod, { token, data: { name: podName } }) : undefined;
+    return { token, pod };
+  };
+  const route = `${base}/.account/admin/delete-account/`;
+  const doomed = `gone-${Date.now()}`;
+  const doomedEmail = `${doomed}@example.org`;
+
+  const admin = await signUp(adminEmail);
+  const first = await signUp(doomedEmail, doomed);
+  check(first.pod.status < 300, `delete account: a throwaway account gets pod "${doomed}" (${first.pod.status})`);
+
+  const notAdmin = await api(route, { token: first.token, data: { email: adminEmail } });
+  check(notAdmin.status === 403, `delete account: a non-admin is refused (${notAdmin.status})`);
+  const anonymous = await api(route, { data: { email: doomedEmail } });
+  check(anonymous.status === 401, `delete account: nobody signed in is refused (${anonymous.status})`);
+
+  const gone = await api(route, { token: admin.token, data: { email: doomedEmail } });
+  check(gone.status === 200 && gone.json.deleted?.pods?.length === 1,
+    `delete account: the admin deletes it and its pod (${gone.status} ${JSON.stringify(gone.json.deleted?.pods ?? gone.json.message)})`);
+  const login = await api((await controlsFor()).password.login, { data: { email: doomedEmail, password } });
+  check(login.status >= 400, `delete account: its login no longer works (${login.status})`);
+
+  // The name is free again: until this component, 409 "There already is a resource".
+  const again = await signUp(`again-${doomedEmail}`, doomed);
+  check(again.pod.status < 300, `delete account: pod name "${doomed}" can be taken again (${again.pod.status} ${again.pod.json.message || ""})`);
+} else {
+  console.log("  skip  delete account: ADMIN_EMAILS unset");
+}
+
 check(pageErrors.length === 0, `no script errors in the pages${pageErrors.length ? `: ${pageErrors.join(" | ")}` : ""}`);
 await browser.close();
 

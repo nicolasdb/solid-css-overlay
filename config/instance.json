@@ -14,6 +14,7 @@
     "css:config/http/static/default.json",
     "css:config/identity/access/public.json",
     "css:config/identity/email/overlay.json",
+    "css:config/identity/handler/account-admin.json",
     "css:config/identity/handler/default.json",
     "css:config/identity/oidc/default.json",
     "css:config/identity/ownership/token.json",
@@ -38,7 +39,7 @@
   "@graph": [
     {
       "comment": [
-        "The image's default: stock css:config/file.json, with four changes. Everything else is stock.",
+        "The image's default: stock css:config/file.json, with five changes. Everything else is stock.",
         "1. Pods are subdomains (alice.example.org), not folders (example.org/alice/). Decided for every NEW",
         "   instance (2026-10-14). NEVER switch an instance that already has folder pods: with the file backend,",
         "   subdomain mode reads data/alice/ as alice.example.org and moves the root to data/www/, so every",
@@ -55,7 +56,10 @@
         "4. The email sender is identity/email/overlay.json, written at every start by start/email.js from",
         "   the instance's SMTP_* variables (instance-template/email.env): stock BaseEmailSender when they are",
         "   set, stock default.json's 'No email server is configured.' when not. Stock default.json gave no",
-        "   way to reset a password."
+        "   way to reset a password.",
+        "5. Admins can delete an account and its pods (stock CSS cannot): identity/handler/account-admin.json,",
+        "   written at every start by start/admins.js from ADMIN_EMAILS, route /.account/admin/delete-account/",
+        "   (account-admin/ in this repo, solid-kit ADR 012). No ADMIN_EMAILS: the route refuses everyone."
       ]
     },
     {

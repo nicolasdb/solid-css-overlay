@@ -448,6 +448,44 @@ function updateIdentity(slug, patch, filePath = DEFAULT_PATH) {
 }
 
 /**
+ * Remove the entries of a deleted CSS account (solid-kit ADR 012): those whose
+ * webId is one of the account's WebIDs, or lives in one of its pods (an
+ * agent's WebID document in the person's pod is gone with the pod). Removed,
+ * not marked revoked: the account they acted for no longer exists, so there
+ * is nothing left to show or un-revoke, and erasure means the row goes too.
+ * `pods` are base URLs as the server answered them (the admin route's
+ * `deleted.pods`), never derived from a WebID's shape (CLAUDE.md).
+ *
+ * @param {{ webIds?: string[], pods?: string[] }} deleted
+ * @param {string} [filePath]
+ * @returns {Promise<string[]>} the labels (or slugs' first 4 chars) removed
+ */
+function removeIdentitiesFor({ webIds = [], pods = [] }, filePath = DEFAULT_PATH) {
+  const result = writeChain.then(() => {
+    const current = _readRawObject(filePath);
+    const gone = (webId) =>
+      typeof webId === "string" && (webIds.includes(webId) || pods.some((pod) => webId.startsWith(pod)));
+    const kept = {};
+    const removed = [];
+    for (const [slug, entry] of Object.entries(current)) {
+      if (entry && gone(entry.webId)) {
+        // Never the slug itself in output: it is a bearer secret.
+        removed.push(entry.label || `${slug.slice(0, 4)}…`);
+      } else {
+        kept[slug] = entry;
+      }
+    }
+    if (removed.length > 0) {
+      validateIdentities(kept, JSON.stringify(kept), path.basename(filePath));
+      _atomicWrite(filePath, kept);
+    }
+    return removed;
+  });
+  writeChain = result.catch(() => {});
+  return result;
+}
+
+/**
  * Non-secret random identifier, distinct from the slug and safe to write
  * into another person's pod (Story 7.9 AC13 — receipts carry grantId, never
  * the slug, because the slug is a bearer credential and receipts land in
@@ -462,6 +500,7 @@ module.exports = {
   validateIdentities,
   writeIdentity,
   updateIdentity,
+  removeIdentitiesFor,
   generateGrantId,
   MIN_SLUG_LENGTH,
   SLUG_SAFE_RE,

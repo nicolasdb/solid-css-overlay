@@ -4,7 +4,8 @@
 # a new overlay on the same stock is -n+1. See CHANGELOG.md.
 #
 # Nothing in CSS is patched. The image only adds files where stock CSS already
-# looks for them (templates/), one config, and one component (PodNameGuard).
+# looks for them (templates/), one config, and two components (PodNameGuard,
+# and AdminDeleteAccountHandler: solid-kit ADR 012).
 ARG CSS_VERSION=7.3.0
 
 # PodNameGuard, built and tested in the stock image it will run in, so on the
@@ -26,16 +27,31 @@ COPY pod-name-guard/src ./src
 COPY pod-name-guard/test ./test
 RUN npm test
 
+# account-admin, the second component (solid-kit ADR 012): built and tested
+# the same way, in the same stock image.
+FROM solidproject/community-server:${CSS_VERSION} AS admin
+WORKDIR /admin
+COPY account-admin/package.json account-admin/package-lock.json ./
+RUN --mount=type=secret,id=npm_ca,required=false \
+    if [ -f /run/secrets/npm_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/npm_ca; fi; \
+    npm ci --no-audit --no-fund
+COPY account-admin/tsconfig.json account-admin/.componentsignore ./
+COPY account-admin/src ./src
+COPY account-admin/test ./test
+RUN npm test
+
 FROM solidproject/community-server:${CSS_VERSION}
 WORKDIR /community-server
 
-# The guard goes where Components.js discovers modules (node_modules under the
+# The components go where Components.js discovers modules (node_modules under the
 # main module path). At runtime it requires @solid/community-server, which in
 # this image is /community-server itself and not a package under node_modules,
 # so NODE_PATH points at a folder holding just that name. Not a symlink inside
 # node_modules: discovery would then find the CSS module twice.
 COPY --from=guard /guard/package.json node_modules/@solid-css-overlay/pod-name-guard/package.json
 COPY --from=guard /guard/dist node_modules/@solid-css-overlay/pod-name-guard/dist
+COPY --from=admin /admin/package.json node_modules/@solid-css-overlay/account-admin/package.json
+COPY --from=admin /admin/dist node_modules/@solid-css-overlay/account-admin/dist
 RUN mkdir -p /opt/css-resolve/@solid && ln -s /community-server /opt/css-resolve/@solid/community-server
 ENV NODE_PATH=/opt/css-resolve
 
@@ -59,11 +75,12 @@ COPY config/ /config/
 ENV CSS_CONFIG=/config/instance.json
 
 # What this instance offers (/.well-known/css/provider.json), its pod layout
-# for the pages and its email sender (config/identity/email/overlay.json, which
-# both configs import), written at every start from the environment, then the stock
+# for the pages, its email sender (config/identity/email/overlay.json) and its
+# admin route (config/identity/handler/account-admin.json), both imported by
+# both configs, written at every start from the environment, then the stock
 # server. The version is the tag (the publish job passes it); local builds say dev.
 ARG OVERLAY_VERSION=dev
 ENV OVERLAY_VERSION=${OVERLAY_VERSION}
-COPY start/describe.js start/email.js start/welcome.js start/start.sh /opt/overlay/
+COPY start/describe.js start/email.js start/admins.js start/welcome.js start/start.sh /opt/overlay/
 ENTRYPOINT ["/opt/overlay/start.sh"]
 # CSS_BASE_URL is the instance's (compose .env); CSS_ROOT_FILE_PATH=/data is stock.

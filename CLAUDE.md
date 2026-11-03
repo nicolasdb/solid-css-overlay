@@ -13,9 +13,10 @@ pins a version and mounts its own `overlay/`. **A feature every instance will
 get is built here**, not in an instance.
 
 CSS is never patched. The image adds files where stock CSS looks for them
-(`templates/`), one config, and one component (`pod-name-guard/`). Adding a
-second component is a decision to write down (an ADR in solid-kit), not a
-commit: every component is code to carry across every CSS release.
+(`templates/`), one config, and two components: `pod-name-guard/` and
+`account-admin/` (solid-kit ADR 012). Adding another is a decision to write
+down (an ADR in solid-kit), not a commit: every component is code to carry
+across every CSS release, and every CSS bump checks each of them.
 
 A collective's procedures and the `collectif` skill live beside the
 connector (`mcp-connector/procedures/`, `mcp-connector/skills/collectif/`):
@@ -25,15 +26,15 @@ implement is solid-kit's ADR 006.
 The comments explaining *what went wrong before* are the most valuable content
 in these files. Keep them when changing the code around them.
 
-Planned features (account deletion, the right to erasure, ...) and their
+Planned features (the account manager page, the right to erasure, ...) and their
 agreed shape: `ROADMAP.md`. What CSS itself does and does not do with
 accounts: README, "Accounts and pods".
 
 ## Commands
 
 See README, "Working on the image". The gate before a tag: both smoke runs
-green and their screenshots looked at, `pod-name-guard` and `mcp-connector`
-tests, `scripts/check-overrides.sh`.
+green and their screenshots looked at, `pod-name-guard`, `account-admin` and
+`mcp-connector` tests, `scripts/check-overrides.sh`.
 
 ## Rules that are easy to break
 
