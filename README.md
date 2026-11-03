@@ -322,6 +322,9 @@ List the admins' login emails in the instance's `.env`, then restart:
 ```sh
 ADMIN_EMAILS=you@example.org            # comma-separated; empty: nobody
 ```
+**Sign up with that email first.** Stock CSS does not verify a login's
+email, so an address listed here that is not yet a login belongs to whoever
+signs up with it first, and makes them admin.
 From the instance's checkout:
 ```sh
 scripts/admin.sh delete-account someone@example.org

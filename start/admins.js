@@ -6,6 +6,11 @@
 // instance never edits the config, so what differs per instance comes from
 // its environment at start.
 //
+// Stock CSS does not verify the email of a password login. An address listed
+// here that is not yet a login on this server belongs to whoever signs up
+// with it first, and makes them admin: list only addresses already in use
+// (.env.example says so to the instance).
+//
 // ADMIN_EMAILS empty or unset: the route is still there and refuses everyone
 // (403). Unlike a broken SMTP setting, that does not stop the start: no admin
 // is the safe default, and an instance with no admin today is a normal one.

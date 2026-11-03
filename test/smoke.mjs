@@ -309,6 +309,7 @@ if (adminEmail) {
   // Account, password login, and optionally a pod: what the register page does.
   const signUp = async (who, podName) => {
     const { json: { authorization: token } } = await api((await controlsFor()).account.create, { data: {} });
+    check(Boolean(token), `delete account: the JSON API makes an account for ${who} (an authorization token)`);
     const controls = await controlsFor(token);
     await api(controls.password.create, { token, data: { email: who, password } });
     const pod = podName ? await api(controls.account.pod, { token, data: { name: podName } }) : undefined;

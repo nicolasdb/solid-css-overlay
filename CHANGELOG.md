@@ -29,6 +29,13 @@ instance updates the image; to use it, add `ADMIN_EMAILS` to `.env`
 - Smoke (both layouts, `ADMIN_EMAILS` set in CI): a throwaway account with a
   pod is refused to a non-admin and to nobody signed in, deleted by the admin,
   its login no longer works, and its pod name is taken again.
+- **An instance that mounts its own copy of `config/instance.json`** (more
+  reserved names, overlay-template) adds one line to its `import` list, after
+  the email one, or the route answers 404:
+  `"css:config/identity/handler/account-admin.json",`
+- **List only emails that are already logins on the server**: stock CSS does
+  not verify a login's email, so an unclaimed address listed in
+  `ADMIN_EMAILS` makes whoever signs up with it first an admin.
 
 ## 7.3.0-3 — 2026-11-03
 
