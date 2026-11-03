@@ -4,6 +4,16 @@ Versions are `<stock CSS version>-<n>`: a new stock release starts at `-1`, a
 new overlay on the same stock adds one. A tag `v<version>` publishes both
 images (`.github/workflows/build.yml`).
 
+## Unreleased
+
+- **Consent keeps the account's agents apart** (#25). A WebID that another
+  WebID of the account declares as its agent (`acl:delegates` in its public
+  profile, as the MCP connector writes it) moves to a closed "Your agents"
+  list under the person's own WebIDs; it is not removed. Only this server's
+  profiles are read, at most 12, 3 s in all, without cookies; a profile that
+  cannot be read moves nothing. Smoke: an agent linked to the test account is
+  listed apart; with the card unreadable, nothing moves.
+
 ## 7.3.0-1 — 2026-11-03
 
 Stock CSS 7.3.0 (#30). An instance updates the image; nothing to change in

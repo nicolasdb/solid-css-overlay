@@ -4,7 +4,9 @@
     cannot take autofocus); the WebID list is sorted, labelled for reading and
     pre-selects the WebID last authorized in this browser; client name and ID are
     inserted as text, not markup (stock inserts the app's own metadata as HTML).
-    Added: #client-origin, where the app runs (solid-kit ADR 010, point 6). -%>
+    Added: #client-origin, where the app runs (solid-kit ADR 010, point 6);
+    #agents, a closed "Your agents" list for the WebIDs another listed WebID
+    declares as its agent (acl:delegates, read from the public profiles). -%>
 <h1 tabindex="-1" autofocus>An app wants to use your pod</h1>
 <p class="error" id="error"></p>
 <p class="intro">
@@ -21,6 +23,14 @@
     <legend>Choose the WebID — your name on the web — this app will act as</legend>
     <ol id="webIdList">
     </ol>
+    <details id="agents" class="agents" hidden>
+      <summary>Your agents (<span id="agentCount"></span>)</summary>
+      <p class="hint">
+        Programs that act for you, such as an assistant connected to your pod.
+        An app you sign in to should normally get your own WebID, not one of theirs.
+      </p>
+      <ol id="agentList"></ol>
+    </details>
   </fieldset>
 
   <fieldset>
@@ -69,7 +79,10 @@
     try { last = localStorage.getItem(LAST_WEBID_KEY); } catch { /* storage blocked */ }
     const preselected = webIds.length === 1 ? webIds[0] : (webIds.includes(last) ? last : null);
 
-    // List WebIDs on page, grouped by pod, the pod's own card first
+    // List WebIDs on page, grouped by pod, the pod's own card first; the
+    // account's agents apart, in a closed list (issue #25).
+    const agents = await findAgents(webIds);
+    const agentList = document.getElementById('agentList');
     for (const webId of sortWebIds(webIds)) {
       const li = document.createElement('li');
       li.className = 'radio';
@@ -81,7 +94,14 @@
       input.checked = webId === preselected;
       label.append(input, webIdLabel(webId));
       li.append(label);
-      webIdList.append(li);
+      (agents.has(webId) ? agentList : webIdList).append(li);
+    }
+    if (agents.size > 0) {
+      const box = document.getElementById('agents');
+      document.getElementById('agentCount').textContent = agents.size;
+      box.hidden = false;
+      // Last time this browser chose an agent: show it, never a hidden choice.
+      box.open = agents.has(preselected);
     }
 
     const { client } = await fetchJson(controls.oidc.consent);
@@ -93,6 +113,57 @@
 
     addPostListener(() => consent(controls));
   })();
+
+  // Which listed WebIDs are agents: a WebID is an agent when another listed
+  // WebID's public profile says `<person> acl:delegates <it>` (the MCP
+  // connector writes that in the person's card for each agent it makes). An
+  // agent has no pod of its own and acts for the person, so signing in to an
+  // app *as* it is almost never what someone means; it is kept, not removed
+  // (a test or an admin may want it).
+  // Bounded and cautious:
+  // - only this server's WebIDs are read: another server is not told that
+  //   someone is signing in here;
+  // - at most AGENT_FETCH_MAX profiles, AGENT_FETCH_MS in all, without
+  //   cookies; whatever is not read in time counts as "not an agent";
+  // - a WebID is only ever moved on what a profile *says*, never because a
+  //   fetch failed: a failure leaves the list as it was before.
+  // N-Triples, one triple per line, so no RDF library in the page; CSS
+  // converts the profile to it. The WebIDs are still not parsed for logic:
+  // the host test only decides whom to ask, and the URIs are compared whole.
+  const AGENT_FETCH_MAX = 12;
+  const AGENT_FETCH_MS = 3000;
+  const DELEGATES = 'http://www.w3.org/ns/auth/acl#delegates';
+  async function findAgents(webIds) {
+    const agents = new Set();
+    if (webIds.length < 2) return agents;
+    const listed = new Set(webIds);
+    const ours = (webId) => {
+      try {
+        const { host } = new URL(webId);
+        return host === location.host || host.endsWith(`.${location.host}`);
+      } catch { return false; }
+    };
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), AGENT_FETCH_MS);
+    const read = async(webId) => {
+      try {
+        // fetch() drops the #fragment: this is the profile document.
+        const res = await fetch(webId, { headers: { accept: 'application/n-triples' }, credentials: 'omit', signal: controller.signal });
+        if (!res.ok) return;
+        for (const line of (await res.text()).split('\n')) {
+          const triple = /^<([^>]*)>\s+<([^>]*)>\s+<([^>]*)>\s*\.\s*$/.exec(line.trim());
+          if (triple && triple[1] === webId && triple[2] === DELEGATES && triple[3] !== webId && listed.has(triple[3])) {
+            agents.add(triple[3]);
+          }
+        }
+      } catch { /* unreadable, timed out: says nothing */ }
+    };
+    await Promise.all(webIds.filter(ours).slice(0, AGENT_FETCH_MAX).map(read));
+    clearTimeout(timer);
+    // Never leave the person without a WebID in plain sight.
+    if (agents.size === webIds.length) agents.clear();
+    return agents;
+  }
 
   // The WebID as a person reads it among six or seven: the pod and the
   // document stand out (key), this server's host, /profile/ and #me are muted

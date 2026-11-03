@@ -273,8 +273,9 @@ li.radio > ol { margin: 8px 0 0 32px; }
    server's host, /profile/, #me; ext = a host that is not this server;
    insecure = an http:// scheme, kept, in danger. Lines break only at the <wbr>
    after each "/", never inside a name. */
-#webIdList { gap: 8px; }
-#webIdList li.radio > label {
+#webIdList, #agentList { gap: 8px; }
+#webIdList li.radio > label,
+#agentList li.radio > label {
   align-items: center;
   padding: 10px 12px;
   border: 1px solid var(--border-control);
@@ -285,10 +286,15 @@ li.radio > ol { margin: 8px 0 0 32px; }
   line-height: 1.5;
   overflow-wrap: break-word;
 }
-#webIdList li.radio > label:has(input:checked) {
+#webIdList li.radio > label:has(input:checked),
+#agentList li.radio > label:has(input:checked) {
   border-color: var(--accent);
   background: var(--accent-soft);
 }
+/* The account's agents (issue #25): closed under the person's own WebIDs. */
+details.agents { margin-top: 16px; }
+details.agents summary { cursor: pointer; padding: 10px 0; color: var(--text-secondary); }
+details.agents p.hint { margin: 4px 0 12px; }
 .webid { flex: 1; min-width: 0; }
 .webid-key { color: var(--text-primary); font-weight: 500; }
 .webid-dim { color: var(--text-tertiary); }
