@@ -265,7 +265,7 @@ included, and no app could read a pod's root. Checked against the image,
 One command on the VPS, from 7.2.0-11:
 
 ```sh
-/srv/<instance>/instance-template/update.sh 7.2.0-13
+/srv/<instance>/instance-template/update.sh 7.3.0-2
 ```
 
 `instance-template/update.sh` checks first and changes nothing if a check
