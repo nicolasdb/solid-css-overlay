@@ -24,10 +24,11 @@ there, only without this overlay's extras.
 |---|---|
 | **Pods are subdomains** | `https://<name>.<server host>/`, WebID `https://<name>.<server host>/profile/card#me`. The default for every new instance. |
 | **Pod names are checked** | `PodNameGuard` (`pod-name-guard/`) refuses, with a 400 the form shows, a name that cannot be a hostname (`open_fab`, 64+ characters, a hyphen at either end) and reserved names (`www`, `mcp`, `api`, …: `config/instance.json`). CSS alone checks only that the name is not empty. The form runs the same check first. |
+| **Admins can delete an account** | `AdminDeleteAccountHandler` (`account-admin/`): an account and its pods go, and the pod names are free again. Stock CSS deletes neither. Admins are the login emails in `ADMIN_EMAILS`; front door `scripts/admin.sh` (below, "Accounts and pods"). |
 | **Authentication is stock** | DPoP and Bearer only. pocpod0's `UnsecureWebIdExtractor` is not in the image. |
 | **The welcome page** | Ours, or the vertical's from its design-system repo, put at the root at every start (`start/welcome.js`). |
 | **The README a new pod starts with** | Ours: what is in the pod, what is public, how sharing and agents work, no Databrowser. Or the vertical's, from the same repo. |
-| **CSS itself** | Untouched. Files are added where stock CSS already looks (`templates/`), plus one config and one component. |
+| **CSS itself** | Untouched. Files are added where stock CSS already looks (`templates/`), plus one config and two components (solid-kit ADR 012 says why the second). |
 
 `config/suffix.json` keeps pods as folders (`https://<server>/<name>/`), for an
 instance that already has pods that way. **An instance never switches between
@@ -313,16 +314,32 @@ by itself (`BaseLoginAccountStorage`, 1800 s). It is the only deletion CSS does.
 - a WebID link;
 - a pod owner.
 
-Nothing deletes the account or the pod, so a pod name, once taken, stays
-taken, and the right to erasure cannot be honoured yet. Both are planned
-(`ROADMAP.md`).
+Nothing in stock deletes the account or the pod, so a pod name, once taken,
+stays taken.
+
+**The image adds deletion, for admins** (since 7.3.0-4, solid-kit ADR 012).
+List the admins' login emails in the instance's `.env`, then restart:
+```sh
+ADMIN_EMAILS=you@example.org            # comma-separated; empty: nobody
+```
+From the instance's checkout:
+```sh
+scripts/admin.sh delete-account someone@example.org
+```
+It asks for your login, then the email again, and deletes: the account, its
+pods and everything in them (the names are free again), its logins, WebID
+links and client credentials, and the connector's agents that acted for it
+(`identities.json`, when the connector runs there). An admin cannot delete
+their own account this way. Self-service "Delete my account", the right to
+erasure, comes next (`ROADMAP.md`).
 
 **Resetting a test instance** deletes every account and pod at once, in
 `instance-template/`:
 ```sh
 docker compose down -v && docker compose up -d
 ```
-It removes the `<INSTANCE_NAME>_css-data` volume and the connector's audit
+Still the quickest way to start a test instance over; one account at a time
+is `scripts/admin.sh` above. It removes the `<INSTANCE_NAME>_css-data` volume and the connector's audit
 volume. The welcome page is rewritten on the next first start. Put
 `mcp-connector/identities.json` back to `{}` too: its agents' accounts are
 gone. **Never on an instance with real accounts.**
@@ -337,6 +354,7 @@ node test/smoke.mjs http://localhost:3123 test/shots/subdomain
 POD_LAYOUT=suffix test/try-local.sh 3124             # folder pods
 POD_LAYOUT=suffix node test/smoke.mjs http://localhost:3124 test/shots/suffix
 (cd pod-name-guard && npm ci && npm test)
+(cd account-admin && npm ci && npm test)
 (cd mcp-connector && npm ci && npm test)
 scripts/check-overrides.sh                           # stock templates we replace, unchanged?
 ```
@@ -355,14 +373,16 @@ The skin audit (contrast, complete slot set) lives in solid-kit:
 | `config/instance.json`, `config/suffix.json` | the two configs; the comments say why each line differs from stock |
 | `overlay/` | the pages: `main.html.ejs`, `main.css`, `pod-ui.js`, `pod-layout.js`, `templates/identity/**`, `templates/pod/base/README$.md.hbs` (a new pod's README), `welcome/`, `doc-view/` (generated from solid-kit, `SOURCE`) |
 | `skins/pod/` | the default skin |
-| `pod-name-guard/` | the one component: pod names that make valid hostnames |
+| `pod-name-guard/` | component 1: pod names that make valid hostnames |
+| `account-admin/` | component 2: admins delete an account and its pods (solid-kit ADR 012) |
+| `scripts/admin.sh` | the admin's front door to `account-admin/` |
 | `upstream-baseline.sha256`, `scripts/check-overrides.sh` | the stock templates `overlay/` replaces, hashed |
 | `test/` | `try-local.sh` (runs the image) + `smoke.mjs` (a real browser, both layouts) |
 | `instance-template/` | what an instance runs from (its checkout): compose, `.env.example`, `email.env.example`, `update.sh`, the Caddy and nginx gateway templates |
 | `overlay-template/` | what the `pods/` folder of a vertical's design-system repo starts from (ADR 011) |
-| `start/` | the image's entrypoint: writes `provider.json`, `pod-layout.js`, the email sender and the welcome page, then runs stock CSS |
+| `start/` | the image's entrypoint: writes `provider.json`, `pod-layout.js`, the email sender, the admin route and the welcome page, then runs stock CSS |
 | `gateway-caddy/` | Caddy + the OVH DNS module, for the wildcard certificate |
 | `docs/` | `faq.md` (sign-in lifetimes, consent), install briefs for one VPS (`handoff-mapsofmaking.md`, `handoff-pocpod0.md`) |
-| `ROADMAP.md` | planned features: account deletion, the right to erasure |
+| `ROADMAP.md` | planned features: the account manager page, the right to erasure |
 | `mcp-connector/` | the connector's source and image |
 | `skills/css-instance/` | the method, for Claude Code; never required |

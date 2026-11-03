@@ -1,0 +1,31 @@
+{
+  "name": "@solid-css-overlay/account-admin",
+  "version": "1.0.0",
+  "description": "Lets an instance's admins delete an account and its pods, which stock CSS cannot (solid-kit ADR 012).",
+  "license": "MIT",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "lsd:module": "https://linkedsoftwaredependencies.org/bundles/npm/@solid-css-overlay/account-admin",
+  "lsd:components": "dist/components/components.jsonld",
+  "lsd:contexts": {
+    "https://linkedsoftwaredependencies.org/bundles/npm/@solid-css-overlay/account-admin/^1.0.0/components/context.jsonld": "dist/components/context.jsonld"
+  },
+  "lsd:importPaths": {
+    "https://linkedsoftwaredependencies.org/bundles/npm/@solid-css-overlay/account-admin/^1.0.0/components/": "dist/components/",
+    "https://linkedsoftwaredependencies.org/bundles/npm/@solid-css-overlay/account-admin/^1.0.0/dist/": "dist/"
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc && componentsjs-generator -s src -c dist/components -r admin -i .componentsignore",
+    "test": "npm run build && node --test test/*.test.js"
+  },
+  "peerDependencies": {
+    "@solid/community-server": "^7.0.0"
+  },
+  "devDependencies": {
+    "@solid/community-server": "7.3.0",
+    "componentsjs-generator": "^3.1.2",
+    "typescript": "^5.5.3"
+  }
+}

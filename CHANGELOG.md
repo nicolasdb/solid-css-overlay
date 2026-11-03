@@ -4,6 +4,32 @@ Versions are `<stock CSS version>-<n>`: a new stock release starts at `-1`, a
 new overlay on the same stock adds one. A tag `v<version>` publishes both
 images (`.github/workflows/build.yml`).
 
+## 7.3.0-4 — 2026-11-03
+
+On stock CSS 7.3.0. **The image's second component** (solid-kit ADR 012). An
+instance updates the image; to use it, add `ADMIN_EMAILS` to `.env`
+(`instance-template/.env.example`) and the line that passes it to
+`compose.yml` comes with the checkout.
+
+- **Admins can delete an account and its pods** (#17, slice 1). Stock CSS
+  deletes neither, so a pod name once taken stayed taken and test rounds could
+  only be cleaned by wiping the volume. `account-admin/` adds
+  `POST /.account/admin/delete-account/ { "email" }`: the pods' contents are
+  deleted through the resource store, each pod root through the data accessor
+  under the write lock (the store refuses a root storage, and a root left
+  behind keeps the name taken), then the account record with its logins,
+  WebID links and client credentials. Only accounts whose login is in
+  `ADMIN_EMAILS` may call it (`start/admins.js` writes it at start, like the
+  email sender); empty, it refuses everyone. An admin cannot delete their own
+  account there.
+- **`scripts/admin.sh delete-account <email>`**: signs in, asks for the email
+  again, calls the route, then removes the connector's agents for that
+  account from `identities.json` (new `removeIdentitiesFor` in
+  `mcp-connector/src/identityRegistry.js`).
+- Smoke (both layouts, `ADMIN_EMAILS` set in CI): a throwaway account with a
+  pod is refused to a non-admin and to nobody signed in, deleted by the admin,
+  its login no longer works, and its pod name is taken again.
+
 ## 7.3.0-3 — 2026-11-03
 
 Overlay only, on stock CSS 7.3.0. An instance updates the image; nothing to

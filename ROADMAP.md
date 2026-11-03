@@ -4,35 +4,27 @@ Features every instance will get, not built yet. Each one says why it is
 needed and the shape agreed so far. What CSS itself does and does not do
 today: README, "Accounts and pods".
 
-## Account and pod deletion, for admins (next)
+## Account and pod deletion, for admins
 
-**Why.** CSS 7.2 deletes no account and no pod. Test rounds leave accounts
-that cannot be removed, and a pod name once taken stays taken. pocpod0
-collected many throwaway accounts this way. Until this exists, a test
-instance is cleaned by a full reset (README), which only works while no real
-account lives there.
+**Slice 1 done (7.3.0-4, solid-kit ADR 012):** `account-admin/`, route
+`POST /.account/admin/delete-account/`, admins from `ADMIN_EMAILS`
+(`start/admins.js`), front door `scripts/admin.sh delete-account`, which
+also drops the connector's agents for that account. The smoke run deletes an
+account with a pod and takes the same name again, on both layouts.
 
-**Shape.**
-- **Inside CSS, as a component on an admin route under `/.account/`.**
-  - It uses CSS's own stores and locks.
-  - It deletes the pods' resources depth first.
-  - Then it calls `delete('account', id)`, which removes the account's
-    logins, pods, WebID links and client credentials in one go.
-  - Deleting files from the volume from outside is not an option: that
-    storage format is CSS's private business and can change at any release,
-    and a script would race the server's locks.
-- **Admins are login emails listed in the instance's config.** The config
-  is not edited by an instance, so the list comes from its environment and
-  is written at start, as the email sender is (`start/email.js`, 7.2.0-9).
-- **Front doors**, all calling that one route:
-  1. `scripts/admin.sh` (list, delete-account), with a `make` target on the
-     VPS;
-  2. an **account-manager page** in the overlay: accounts and their pods,
-     each with a delete button.
-- **Outside CSS**: the connector's `identities.json` entries for a deleted
-  WebID are removed as well.
-- **It is the image's second component**, so a solid-kit ADR comes first
-  (CLAUDE.md): every component is code to carry across every CSS release.
+What was learnt building it: the store refuses to delete a pod root (a root
+storage, Solid §5.4) and CSS refuses to create a pod while anything is at its
+base, so the root goes through the data accessor under the write lock
+(`AdminDeleteAccountHandler.ts`, header). One more CSS internal to check at
+each bump.
+
+**Next, slice 2: see and choose.**
+- `scripts/admin.sh list`: accounts, their logins and pods. Needs the account
+  storage's `entries('account')`; the stores have no "list all".
+- An **account-manager page** in the overlay for admins: accounts and their
+  pods, a delete button each, calling the same route.
+- A `make` target on the VPS (vps-infra, not this repo: an instance's
+  checkout is never edited).
 
 ## Self-service erasure: the right to erasure
 
@@ -40,7 +32,9 @@ account lives there.
 CSS instance today, nobody can do it, not even an admin.
 
 **Shape.** "Delete my account" on the person's own account page, on the same
-route as above, limited to their own account. The page says plainly what goes:
+handler as above, limited to their own account (the admin route refuses an
+admin's own account on purpose: that is this door). Where the button lives,
+the overlay or solid-backoffice, is ADR 012's open question. The page says plainly what goes:
 - their pods and everything in them;
 - their WebID;
 - the agents' access.
