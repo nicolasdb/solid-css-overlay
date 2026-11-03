@@ -11,8 +11,6 @@
 #            variable, so export it once for both.
 # COMPOSE_PROFILES, MCP_PUBLIC_BASE  passed through when set, as compose does:
 #            they decide what /.well-known/css/provider.json offers.
-# ADMIN_EMAILS  passed through when set (start/admins.js); smoke.mjs then
-#            signs up its first address and checks account deletion.
 # TRY_NETWORK=host  share the host's network instead of publishing the port
 #            (Linux; for a sandbox where published ports do not answer).
 #
@@ -39,11 +37,12 @@ work="${TMPDIR:-/tmp}/$name"
 
 rm -rf "$work" && mkdir -p "$work/data"
 chmod 777 "$work/data"
-args=(--rm -d --name "$name" -v "$work/data:/data"
+# No --rm: a server that dies keeps its log for `docker logs` (the smoke run
+# prints it when the admin tool fails). The next run removes it (rm -f below).
+args=(-d --name "$name" -v "$work/data:/data"
   -e "CSS_BASE_URL=http://localhost:$port/" -e "CSS_PORT=$port")
 [ -n "${COMPOSE_PROFILES:-}" ] && args+=(-e "COMPOSE_PROFILES=$COMPOSE_PROFILES")
 [ -n "${MCP_PUBLIC_BASE:-}" ] && args+=(-e "MCP_PUBLIC_BASE=$MCP_PUBLIC_BASE")
-[ -n "${ADMIN_EMAILS:-}" ] && args+=(-e "ADMIN_EMAILS=$ADMIN_EMAILS")
 if [ "${TRY_NETWORK:-}" = host ]; then args+=(--network host); else args+=(-p "$port:$port"); fi
 
 case "$layout" in

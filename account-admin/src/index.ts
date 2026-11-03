@@ -1,1 +1,1 @@
-export * from './AdminDeleteAccountHandler';
+export * from './AccountAdminHandler';

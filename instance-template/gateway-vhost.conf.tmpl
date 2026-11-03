@@ -68,6 +68,15 @@ server {
     # Files people put in their pods.
     client_max_body_size 100m;
 
+    # The account admin route (solid-kit ADR 012) is for the server's own
+    # terminal (scripts/admin.sh calls it from inside the container). It needs
+    # a token only the container can read; refusing it here as well means a
+    # guessed token never even reaches CSS. On every host here (nginx has no
+    # tidy per-host location): it also hides a pod resource at that path.
+    location ^~ /.account/admin/ {
+        return 404;
+    }
+
     location / {
         # Variable + resolver: resolved per request, so nginx still starts
         # (and serves every other site) while this container is down.

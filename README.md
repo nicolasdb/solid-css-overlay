@@ -24,7 +24,7 @@ there, only without this overlay's extras.
 |---|---|
 | **Pods are subdomains** | `https://<name>.<server host>/`, WebID `https://<name>.<server host>/profile/card#me`. The default for every new instance. |
 | **Pod names are checked** | `PodNameGuard` (`pod-name-guard/`) refuses, with a 400 the form shows, a name that cannot be a hostname (`open_fab`, 64+ characters, a hyphen at either end) and reserved names (`www`, `mcp`, `api`, …: `config/instance.json`). CSS alone checks only that the name is not empty. The form runs the same check first. |
-| **Admins can delete an account** | `AdminDeleteAccountHandler` (`account-admin/`): an account and its pods go, and the pod names are free again. Stock CSS deletes neither. Admins are the login emails in `ADMIN_EMAILS`; front door `scripts/admin.sh` (below, "Accounts and pods"). |
+| **Accounts can be listed and deleted** | From the server's terminal: `scripts/admin.sh` opens a TUI that lists every account, then sorts, filters, selects and deletes them with their pods. The pod names come free again. Stock CSS does neither. [`docs/admin/`](docs/admin/README.md) |
 | **Authentication is stock** | DPoP and Bearer only. pocpod0's `UnsecureWebIdExtractor` is not in the image. |
 | **The welcome page** | Ours, or the vertical's from its design-system repo, put at the root at every start (`start/welcome.js`). |
 | **The README a new pod starts with** | Ours: what is in the pod, what is public, how sharing and agents work, no Databrowser. Or the vertical's, from the same repo. |
@@ -317,24 +317,15 @@ by itself (`BaseLoginAccountStorage`, 1800 s). It is the only deletion CSS does.
 Nothing in stock deletes the account or the pod, so a pod name, once taken,
 stays taken.
 
-**The image adds deletion, for admins** (since 7.3.0-4, solid-kit ADR 012).
-List the admins' login emails in the instance's `.env`, then restart:
+**The image adds listing and deletion, from the server's terminal** (since
+7.3.0-4, solid-kit ADR 012). From the instance's checkout:
 ```sh
-ADMIN_EMAILS=you@example.org            # comma-separated; empty: nobody
+scripts/admin.sh            # TUI: list, sort, filter, select, delete
 ```
-**Sign up with that email first.** Stock CSS does not verify a login's
-email, so an address listed here that is not yet a login belongs to whoever
-signs up with it first, and makes them admin.
-From the instance's checkout:
-```sh
-scripts/admin.sh delete-account someone@example.org
-```
-It asks for your login, then the email again, and deletes: the account, its
-pods and everything in them (the names are free again), its logins, WebID
-links and client credentials, and the connector's agents that acted for it
-(`identities.json`, when the connector runs there). An admin cannot delete
-their own account this way. Self-service "Delete my account", the right to
-erasure, comes next (`ROADMAP.md`).
+Being able to run it is the permission (ssh and docker): there is no admin
+password and no admin list. Tutorial, how-to, reference and explanation are in
+[`docs/admin/`](docs/admin/README.md). Self-service "Delete my account", the
+right to erasure, comes next (`ROADMAP.md`).
 
 **Resetting a test instance** deletes every account and pod at once, in
 `instance-template/`:
@@ -377,15 +368,15 @@ The skin audit (contrast, complete slot set) lives in solid-kit:
 | `overlay/` | the pages: `main.html.ejs`, `main.css`, `pod-ui.js`, `pod-layout.js`, `templates/identity/**`, `templates/pod/base/README$.md.hbs` (a new pod's README), `welcome/`, `doc-view/` (generated from solid-kit, `SOURCE`) |
 | `skins/pod/` | the default skin |
 | `pod-name-guard/` | component 1: pod names that make valid hostnames |
-| `account-admin/` | component 2: admins delete an account and its pods (solid-kit ADR 012) |
-| `scripts/admin.sh` | the admin's front door to `account-admin/` |
+| `account-admin/` | component 2: list accounts, delete one with its pods (solid-kit ADR 012) |
+| `admin/admin.js`, `scripts/admin.sh` | the account admin's terminal tool, and its launcher on an instance |
 | `upstream-baseline.sha256`, `scripts/check-overrides.sh` | the stock templates `overlay/` replaces, hashed |
 | `test/` | `try-local.sh` (runs the image) + `smoke.mjs` (a real browser, both layouts) |
 | `instance-template/` | what an instance runs from (its checkout): compose, `.env.example`, `email.env.example`, `update.sh`, the Caddy and nginx gateway templates |
 | `overlay-template/` | what the `pods/` folder of a vertical's design-system repo starts from (ADR 011) |
 | `start/` | the image's entrypoint: writes `provider.json`, `pod-layout.js`, the email sender, the admin route and the welcome page, then runs stock CSS |
 | `gateway-caddy/` | Caddy + the OVH DNS module, for the wildcard certificate |
-| `docs/` | `faq.md` (sign-in lifetimes, consent), install briefs for one VPS (`handoff-mapsofmaking.md`, `handoff-pocpod0.md`) |
+| `docs/` | `admin/` (account admin: tutorial, how-to, reference, explanation), `faq.md` (sign-in lifetimes, consent), install briefs for one VPS (`handoff-mapsofmaking.md`, `handoff-pocpod0.md`) |
 | `ROADMAP.md` | planned features: the account manager page, the right to erasure |
 | `mcp-connector/` | the connector's source and image |
 | `skills/css-instance/` | the method, for Claude Code; never required |

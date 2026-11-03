@@ -14,6 +14,7 @@ import { chromium } from "playwright";
 import { mkdirSync } from "node:fs";
 import crypto from "node:crypto";
 import http from "node:http";
+import { execFileSync } from "node:child_process";
 
 const base = (process.argv[2] || "http://localhost:3123").replace(/\/$/, "");
 const out = process.argv[3] || "smoke-shots";
@@ -286,17 +287,31 @@ await w.goto(`${base}/.account/login/password/forgot/`);
 await submitReady(w);
 await shot(w, "12-forgot");
 
-// Account deletion by an admin (account-admin/, solid-kit ADR 012). Stock CSS
-// deletes no account and no pod, so a pod name once taken stayed taken and
-// every test round burned names. The gate: an account with a pod is deleted,
-// and the same pod name can be taken again (a pod root left behind answers
-// 409). Through the JSON API from node: the account API is on the bare
-// domain. Runs when try-local.sh got ADMIN_EMAILS (CI sets it).
-const adminEmail = (process.env.ADMIN_EMAILS || "").split(",")[0].trim();
-if (adminEmail) {
-  const api = async (url, { token, data, method } = {}) => {
+// Account admin (account-admin/ + admin/admin.js, solid-kit ADR 012). Stock
+// CSS lists no other account and deletes none, so a pod name once taken
+// stayed taken and every test round burned names. The gate: the admin tool,
+// run inside the container as scripts/admin.sh runs it, lists an account
+// with a pod and deletes it, and the same pod name can be taken again (a pod
+// root left behind answers 409). From outside, the route refuses whatever
+// token is sent. Account API calls go to the bare domain, which node reaches.
+{
+  const container = process.env.SMOKE_CONTAINER || `try-css-overlay-${new URL(base).port}`;
+  const docker = process.env.DOCKER || "docker";
+  const admin = (...args) => {
+    try {
+      return JSON.parse(execFileSync(docker, ["exec", container, "node", "/opt/overlay/admin.js", ...args, "--json"],
+        { encoding: "utf-8", timeout: 60000 }));
+    } catch (error) {
+      // What the server said is the only clue when the tool dies without a word.
+      let logs = "";
+      try { logs = execFileSync(docker, ["logs", "--tail", "60", container], { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] }); } catch (e) { logs = `${e.stdout || ""}${e.stderr || ""}` || e.message; }
+      console.log(`--- admin.js ${args.join(" ")} failed (${error.status ?? error.signal}): ${error.stderr || error.message}\n--- server log:\n${logs}`);
+      throw error;
+    }
+  };
+  const api = async (url, { token, data } = {}) => {
     const res = await fetch(url, {
-      method: method || (data === undefined ? "GET" : "POST"),
+      method: data === undefined ? "GET" : "POST",
       // No content-type on a GET: CSS then parses the empty body as JSON and
       // answers 400 without controls (first CI run of 7.3.0-4).
       headers: {
@@ -311,43 +326,40 @@ if (adminEmail) {
   const controlsFor = async (token) => {
     const { status, json } = await api(`${base}/.account/`, { token });
     if (!json.controls) {
-      throw new Error(`delete account: GET /.account/ gave no controls (${status} ${JSON.stringify(json).slice(0, 200)})`);
+      throw new Error(`account admin: GET /.account/ gave no controls (${status} ${JSON.stringify(json).slice(0, 200)})`);
     }
     return json.controls;
   };
-  // Account, password login, and optionally a pod: what the register page does.
+  // Account, password login, and a pod: what the register page does.
   const signUp = async (who, podName) => {
     const { json: { authorization: token } } = await api((await controlsFor()).account.create, { data: {} });
-    check(Boolean(token), `delete account: the JSON API makes an account for ${who} (an authorization token)`);
+    check(Boolean(token), `account admin: the JSON API makes an account for ${who} (an authorization token)`);
     const controls = await controlsFor(token);
     await api(controls.password.create, { token, data: { email: who, password } });
-    const pod = podName ? await api(controls.account.pod, { token, data: { name: podName } }) : undefined;
-    return { token, pod };
+    return api(controls.account.pod, { token, data: { name: podName } });
   };
-  const route = `${base}/.account/admin/delete-account/`;
   const doomed = `gone-${Date.now()}`;
   const doomedEmail = `${doomed}@example.org`;
 
-  const admin = await signUp(adminEmail);
   const first = await signUp(doomedEmail, doomed);
-  check(first.pod.status < 300, `delete account: a throwaway account gets pod "${doomed}" (${first.pod.status})`);
+  check(first.status < 300, `account admin: a throwaway account gets pod "${doomed}" (${first.status})`);
 
-  const notAdmin = await api(route, { token: first.token, data: { email: adminEmail } });
-  check(notAdmin.status === 403, `delete account: a non-admin is refused (${notAdmin.status})`);
-  const anonymous = await api(route, { data: { email: doomedEmail } });
-  check(anonymous.status === 401, `delete account: nobody signed in is refused (${anonymous.status})`);
+  const outside = await api(`${base}/.account/admin/accounts/`, { data: { token: "x".repeat(43), action: "list" } });
+  check(outside.status === 403, `account admin: the route refuses a guessed token from outside (${outside.status})`);
 
-  const gone = await api(route, { token: admin.token, data: { email: doomedEmail } });
-  check(gone.status === 200 && gone.json.deleted?.pods?.length === 1,
-    `delete account: the admin deletes it and its pod (${gone.status} ${JSON.stringify(gone.json.deleted?.pods ?? gone.json.message)})`);
+  const listed = admin("list").find((a) => a.emails.includes(doomedEmail));
+  check(listed?.pods.length === 1, `account admin: the tool lists it with its pod (${JSON.stringify(listed?.pods)})`);
+  check(admin("list").some((a) => a.emails.includes(email)), "account admin: the tool lists the smoke run's own account too");
+
+  const [gone] = admin("delete", doomedEmail, "--yes");
+  check(gone?.pods?.[0] === listed?.pods?.[0], `account admin: the tool deletes it and its pod (${JSON.stringify(gone?.pods)})`);
+  check(!admin("list").some((a) => a.emails.includes(doomedEmail)), "account admin: it is no longer listed");
   const login = await api((await controlsFor()).password.login, { data: { email: doomedEmail, password } });
-  check(login.status >= 400, `delete account: its login no longer works (${login.status})`);
+  check(login.status >= 400, `account admin: its login no longer works (${login.status})`);
 
   // The name is free again: until this component, 409 "There already is a resource".
   const again = await signUp(`again-${doomedEmail}`, doomed);
-  check(again.pod.status < 300, `delete account: pod name "${doomed}" can be taken again (${again.pod.status} ${again.pod.json.message || ""})`);
-} else {
-  console.log("  skip  delete account: ADMIN_EMAILS unset");
+  check(again.status < 300, `account admin: pod name "${doomed}" can be taken again (${again.status} ${again.json.message || ""})`);
 }
 
 check(pageErrors.length === 0, `no script errors in the pages${pageErrors.length ? `: ${pageErrors.join(" | ")}` : ""}`);

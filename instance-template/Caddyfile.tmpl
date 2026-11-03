@@ -53,6 +53,19 @@
 		reverse_proxy {{INSTANCE_NAME}}-mcp-connector:3939
 	}
 
+	# The account admin route (solid-kit ADR 012) is for the server's own
+	# terminal (scripts/admin.sh calls it from inside the container). It needs
+	# a token only the container can read; refusing it here as well means a
+	# guessed token never even reaches CSS. On the server's host only: on a pod
+	# host the same path is the pod's own.
+	@accountadmin {
+		host {{DOMAIN}}
+		path /.account/admin/*
+	}
+	handle @accountadmin {
+		respond 404
+	}
+
 	handle {
 		# reverse_proxy passes the Host through unchanged, and CSS needs it so:
 		# the Host decides WHICH POD a request is for. Never rewrite it (ADR 002

@@ -6,25 +6,21 @@ today: README, "Accounts and pods".
 
 ## Account and pod deletion, for admins
 
-**Slice 1 done (7.3.0-4, solid-kit ADR 012):** `account-admin/`, route
-`POST /.account/admin/delete-account/`, admins from `ADMIN_EMAILS`
-(`start/admins.js`), front door `scripts/admin.sh delete-account`, which
-also drops the connector's agents for that account. The smoke run deletes an
-account with a pod and takes the same name again, on both layouts.
+**Done (7.3.0-4, solid-kit ADR 012 and its amendment):** `scripts/admin.sh`,
+a TUI run from the server's terminal that lists, sorts, filters, selects and
+deletes accounts with their pods, and removes the connector's agents for them.
+The permission is shell access on the server (a token the container renews at
+every start), not a list of admin emails. Docs: `docs/admin/`.
 
 What was learnt building it: the store refuses to delete a pod root (a root
 storage, Solid §5.4) and CSS refuses to create a pod while anything is at its
 base, so the root goes through the data accessor under the write lock
-(`AdminDeleteAccountHandler.ts`, header). One more CSS internal to check at
-each bump.
+(`account-admin/src/AccountAdminHandler.ts`, header). One more CSS internal to
+check at each bump.
 
-**Next, slice 2: see and choose.**
-- `scripts/admin.sh list`: accounts, their logins and pods. Needs the account
-  storage's `entries('account')`; the stores have no "list all".
-- An **account-manager page** in the overlay for admins: accounts and their
-  pods, a delete button each, calling the same route.
-- A `make` target on the VPS (vps-infra, not this repo: an instance's
-  checkout is never edited).
+**Left:** a `make` target on the VPS (vps-infra, not this repo: an instance's
+checkout is never edited). A browser page for admins is not planned: it would
+need its own answer to "who is this?" (ADR 012).
 
 ## Self-service erasure: the right to erasure
 
@@ -32,8 +28,8 @@ each bump.
 CSS instance today, nobody can do it, not even an admin.
 
 **Shape.** "Delete my account" on the person's own account page, on the same
-handler as above, limited to their own account (the admin route refuses an
-admin's own account on purpose: that is this door). Where the button lives,
+deletion as above, limited to their own account and opened by their own
+sign-in instead of the server's token. Where the button lives,
 the overlay or solid-backoffice, is ADR 012's open question. The page says plainly what goes:
 - their pods and everything in them;
 - their WebID;
