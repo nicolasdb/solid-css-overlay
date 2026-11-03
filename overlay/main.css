@@ -590,3 +590,9 @@ ol.breadcrumbs > li:only-child { display: none; }
 @media (prefers-reduced-motion: reduce) {
   .pending-line { animation: none; left: 0; width: 100%; opacity: 0.5; }
 }
+
+/* CSS 7.3.0's WebID recovery links (consent, account). On consent it is an
+   aside to the choice above, not part of it: set apart and quieter. On the
+   account page it sits beside "Link a WebID": a gap, never run together. */
+#recoverWebId:is(p) { margin-top: 24px; font-size: 0.875rem; color: var(--text-secondary); }
+#linkWebId + #recoverWebId { margin-left: 1.5em; }

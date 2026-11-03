@@ -1,4 +1,4 @@
-<%# Override of CSS 7.2.0 identity/oidc/consent.html.ejs (upstream-baseline.sha256).
+<%# Override of CSS 7.3.0 identity/oidc/consent.html.ejs (upstream-baseline.sha256).
     Kept from stock: every id, name and the consent flow in consent().
     Changed: copy; focus starts on the heading (#authorize is disabled at load and
     cannot take autofocus); the WebID list is sorted, labelled for reading and
@@ -36,6 +36,11 @@
     <button id="cancel" type="button">Cancel</button>
     <button id="edit-account" type="button" class="alternate">Edit account</button>
     <button id="switch-account" type="button" class="alternate">Use a different account</button>
+  </p>
+
+  <p id="recoverWebId">
+    If an app can't read or use a WebID that lives in one of your pods, stop here:
+    <a id="recover-webid" href="" class="link">repair it first</a> from your account.
   </p>
 </form>
 
@@ -168,6 +173,7 @@
   }
 
   function wireButtons(controls) {
+    const recoverWebIdLink = document.getElementById('recover-webid');
     elements.cancel.addEventListener('click', async() => {
       const res = await fetch(controls.oidc.cancel, { method: 'POST' });
       location.href = (await res.json()).location;
@@ -177,6 +183,15 @@
       await fetch(controls.account.logout, { method: 'POST' });
       location.href = controls.html.main.login;
     });
+
+    // CSS 7.3.0 (stock, kept): a broken WebID is repaired before it is used again, so the flow is not
+    // resumed here: without a `return` parameter the recovery page goes back to the account page.
+    // A link needs a real href: an empty one would navigate to the current page.
+    if (controls.html.account?.recoverWebId) {
+      recoverWebIdLink.href = controls.html.account.recoverWebId;
+    } else {
+      setVisibility('recoverWebId', false);
+    }
   }
 
   // Adds client info to the UI. As text: the name and ID come from the app's
