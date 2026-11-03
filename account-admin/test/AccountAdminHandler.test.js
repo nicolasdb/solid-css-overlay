@@ -10,6 +10,8 @@ const { AccountAdminHandler } = require('../dist');
 
 const POD = 'https://gone.example.org/';
 const TOKEN = 't'.repeat(43);
+const BASE = 'https://example.org/';
+const ACCOUNTS = `${BASE}.internal/accounts/data/`;
 
 // A pod as the file backend lists it: containers end in '/', .acl files are
 // listed as children, .meta files are not.
@@ -17,6 +19,9 @@ function makeWorld({ failOn, token = TOKEN } = {}) {
   const tree = {
     [POD]: [`${POD}.acl`, `${POD}profile/`, `${POD}README`, `${POD}README.acl`],
     [`${POD}profile/`]: [`${POD}profile/card`],
+    // The accounts folder as the file backend lists it, plus a stray entry
+    // the account storage does not know.
+    [ACCOUNTS]: ['keep', 'target', 'halfway', 'stale'].map((id) => `${ACCOUNTS}${id}`),
   };
   const log = [];
   const logins = {
@@ -29,11 +34,8 @@ function makeWorld({ failOn, token = TOKEN } = {}) {
     accountStorage: {
       delete: async (type, id) => { log.push(`account:${type}:${id}`); },
       has: async (type, id) => type === 'account' && id in logins,
-      entries: async function* (type) {
-        assert.equal(type, 'account');
-        for (const id of Object.keys(logins)) {
-          yield { id, rememberLogin: false };
-        }
+      entries: async function* () {
+        throw new Error('entries() walks the lock files too and stalls the server: never call it');
       },
     },
     passwordStore: {
@@ -77,7 +79,7 @@ function makeWorld({ failOn, token = TOKEN } = {}) {
   };
   world.handler = new AccountAdminHandler(
     world.accountStorage, world.passwordStore, world.podStore, world.webIdStore,
-    world.store, world.accessor, world.auxiliaryStrategy, world.locker, token,
+    world.store, world.accessor, world.auxiliaryStrategy, world.locker, token, BASE,
   );
   return world;
 }
@@ -98,6 +100,12 @@ test('a configured token shorter than 32 characters refuses everyone, even when 
     const world = makeWorld({ token });
     await assert.rejects(call(world, { token, action: 'list' }), (error) => error.statusCode === 403);
   }
+});
+
+test('an empty server (no accounts folder yet) lists nothing', async () => {
+  const world = makeWorld();
+  world.accessor.getChildren = async function* () { throw new NotFoundHttpError(); };
+  assert.deepEqual((await call(world, { token: TOKEN, action: 'list' })).json.accounts, []);
 });
 
 test('lists every account with its logins, pods and WebIDs, a halfway sign-up included', async () => {

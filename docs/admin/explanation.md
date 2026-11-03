@@ -56,6 +56,60 @@ templates, never reaches CSS).
 That means no browser page for admins. If one is ever wanted, it needs its own
 answer to "who is this?", and ADR 012 is the place to decide it.
 
+## What building it taught us
+
+Each of these was found by running the real server, not by reading the docs.
+Together they are the case for doing this inside CSS, carefully, and testing
+it on every CSS release.
+
+**1. The pod root cannot be deleted the normal way, and leaving it keeps
+the name taken.**
+- *Found:* the store answers "Cannot delete a root storage container" (405,
+  Solid §5.4), and pod creation answers 409 "There already is a resource"
+  while anything is at the address.
+- *So:* only deleting through the store would have looked like success, yet
+  never freed a name.
+- *What we do:* the contents go through the store and the root through the
+  accessor, under the lock (above).
+- *Where it shows:* the smoke run takes the same pod name again after every
+  deletion.
+
+**2. CSS's own "list everything" stalls, and a stalled lock takes the whole
+server down.**
+- *Found (first CI run of the tool, 2026-11-03):*
+  - Listing accounts with the account storage's `entries('account')` walks
+    every document CSS keeps under `/.internal/` through the resource store.
+    That includes the server's lock files, which live in the same place.
+  - The request waited on a lock until `Lock expired after 6000ms`. Then CSS
+    exited, taking every pod on that server offline.
+  - Nothing in stock CSS calls that walk while serving requests, so nobody had
+    hit it.
+- *What we do:* the tool lists the accounts folder's names through the data
+  accessor (a directory read, no lock). It checks each one against the account
+  storage, and only then reads that account's logins and pods.
+- *Two lessons:*
+  - **One wrong storage call in a component is an outage, not an error
+    message.** The smoke run must exercise every route on a real server, on
+    both pod layouts, at every CSS bump.
+  - **A script on the data folder would be worse still.** It would hit the
+    same locks from outside the process that owns them. ("Why inside CSS",
+    above.)
+
+**3. An email is not an identity in CSS.**
+- *Found:* CSS never verifies that a login's email belongs to whoever signs up
+  with it.
+- *So:* an admin list of emails would make whoever claims an unused address an
+  admin.
+- *What we do:* the permission is the server's terminal ("Why the terminal",
+  above).
+
+**4. Stock CSS cannot answer "who has an account here?"**
+- *Found:* its account API only shows the signed-in account its own data.
+- *So:* without this tool an admin can neither see nor clean what accumulates:
+  test accounts, sign-ups left halfway, accounts nobody uses.
+- *Why it matters:* knowing what lives on the server comes before any
+  responsible deletion, and before opening a server to the public.
+
 ## Why the connector clean-up is in the script
 
 The MCP connector keeps its agents' credentials in `identities.json`, outside

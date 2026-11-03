@@ -83,6 +83,7 @@ export class AccountAdminHandler extends JsonInteractionHandler {
   private readonly auxiliaryStrategy: AuxiliaryStrategy;
   private readonly locker: ReadWriteLocker;
   private readonly token: Buffer;
+  private readonly accountsContainer: ResourceIdentifier;
 
   /**
    * @param accountStorage - The account storage (urn:solid-server:default:AccountStorage).
@@ -94,6 +95,7 @@ export class AccountAdminHandler extends JsonInteractionHandler {
    * @param auxiliaryStrategy - Tells which children the store removes with their subject.
    * @param locker - The resource locker the store uses.
    * @param token - The secret a caller must send. Shorter than 32 characters: every call is refused.
+   * @param baseUrl - The server's base URL, where CSS keeps its internal storage (`.internal/`).
    */
   public constructor(
     accountStorage: AccountLoginStorage<Record<string, never>>,
@@ -105,6 +107,7 @@ export class AccountAdminHandler extends JsonInteractionHandler {
     auxiliaryStrategy: AuxiliaryStrategy,
     locker: ReadWriteLocker,
     token: string,
+    baseUrl: string,
   ) {
     super();
     this.accountStorage = accountStorage;
@@ -116,6 +119,10 @@ export class AccountAdminHandler extends JsonInteractionHandler {
     this.auxiliaryStrategy = auxiliaryStrategy;
     this.locker = locker;
     this.token = Buffer.from(token ?? '');
+    // Where config/storage/key-value/resource-store.json (JsonResourceStorage,
+    // container /.internal/) and identity/handler/storage/default.json
+    // (ContainerPathStorage, /accounts/data/) put one document per account.
+    this.accountsContainer = { path: new URL('.internal/accounts/data/', baseUrl).href };
   }
 
   public async handle({ json }: JsonInteractionHandlerInput): Promise<JsonRepresentation> {
@@ -142,14 +149,27 @@ export class AccountAdminHandler extends JsonInteractionHandler {
   }
 
   private async list(): Promise<AccountSummary[]> {
-    // Ids first, details after. entries() streams the account container
-    // (JsonResourceStorage) while CSS holds its lock; looking up logins and
-    // pods inside that loop waited on the same lock, which expired after 6 s
-    // and took the whole server down ("Lock expired after 6000ms", first CI
-    // run of the admin tool, 2026-11-03).
+    // NOT accountStorage.entries('account'). That walks every document under
+    // CSS's /.internal/ through the resource store, the lock files included
+    // (they live in the same container), and on 7.3.0 it stalled until "Lock
+    // expired after 6000ms" and the server exited (first CI run of the admin
+    // tool, 2026-11-03). Stock CSS never calls it while serving requests.
+    // Instead: the names in the accounts folder, read through the data
+    // accessor (a directory listing, no lock), each confirmed by the account
+    // storage itself.
     const ids: string[] = [];
-    for await (const account of this.accountStorage.entries('account')) {
-      ids.push(account.id);
+    try {
+      for await (const metadata of this.accessor.getChildren(this.accountsContainer)) {
+        const id = decodeURIComponent(metadata.identifier.value.slice(this.accountsContainer.path.length));
+        if (id && !id.includes('/') && await this.accountStorage.has('account', id)) {
+          ids.push(id);
+        }
+      }
+    } catch (error: unknown) {
+      // No account was ever made: the folder does not exist yet.
+      if (!NotFoundHttpError.isInstance(error)) {
+        throw error;
+      }
     }
     const accounts: AccountSummary[] = [];
     for (const id of ids) {
