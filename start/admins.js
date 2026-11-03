@@ -53,6 +53,7 @@ const config = {
           auxiliaryStrategy: { "@id": "urn:solid-server:default:AuxiliaryStrategy" },
           locker: { "@id": "urn:solid-server:default:ResourceLocker" },
           token,
+          baseUrl: { "@id": "urn:solid-server:default:variable:baseUrl" },
         },
       },
     },
