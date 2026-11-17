@@ -8,13 +8,15 @@ description: Use when the person in a Claude conversation wants to save, capture
 Your pod connection is a **capture path**, not a document dump: externalize
 something worth keeping from this conversation into the person's own pod —
 and, unlike an artifact you download and re-import, **read it back later and
-build on it**. Ten tools are available: `solid_read_resource`,
-`solid_list_container`, `solid_get_permissions` (all safe, no ceremony),
-`solid_append_resource` (the default write path), `solid_write_resource`,
-`solid_delete_resource`, the three permission tools (`solid_grant_access`,
-`solid_revoke_access`, `solid_set_public_access`), and `solid_prepare_upload`
-(for a file that already exists on disk — see "Uploading an existing file"
-below; **shell-capable clients only**, not claude.ai).
+build on it**. Thirteen tools are available: `solid_whoami`,
+`solid_read_resource`, `solid_list_container`, `solid_get_permissions` (all
+safe, no ceremony), `solid_append_resource` (the default write path),
+`solid_write_resource`, `solid_delete_resource`, the three permission tools
+(`solid_grant_access`, `solid_revoke_access`, `solid_set_public_access`),
+`solid_prepare_upload` (for a file that already exists on disk — see
+"Uploading an existing file" below; **shell-capable clients only**, not
+claude.ai), and `graph_query` / `graph_ingest`, for a collective's work
+(the `collectif` skill, `skills/collectif/SKILL.md`, not this one).
 
 ## When to offer capture
 
@@ -90,9 +92,11 @@ is verified gone, not assumed.
 
 Reading a resource whose pod root differs from your own identity's pod root
 posts a receipt (timestamp, your label, the resource, the outcome) as its own
-new resource in *that resource's owner's* `access-log/` container — not your
-own. One resource per receipt, because that is the write an **append-only**
-grant permits: you can add entries there and cannot read, overwrite, or
+new resource in a log *that resource's owner* can consult — not your own.
+Today that log is their `access-log/` container, which is deprecated: receipts
+are moving to a log the owner reads from their account (`procedures/README.md`,
+"Open"), so don't point a person to that path. One resource per receipt,
+because that is the write an **append-only** grant permits: you can add entries there and cannot read, overwrite, or
 delete the ones already written, including your own. So a person asking "can
 your agent quietly edit the log of what it read?" gets a straight no — the
 server refuses it (verified live 2026-08-11).
@@ -104,7 +108,7 @@ Two things that no is *not*:
   reader that declines to write one leaves no trace by this mechanism. If a
   person asks whether their pod logs who reads it: it doesn't, on its own.
 - It is **not protection from the pod owner.** They hold control over their
-  own `access-log/` and can edit it. The receipt is evidence against the
+  own log and can edit it. The receipt is evidence against the
   reader, which is the direction that matters — evidence held by the party
   being audited could be quietly deleted by them.
 
@@ -144,8 +148,8 @@ omit it.
 **This tool needs a shell. claude.ai does not have one and cannot run the
 returned command** — asking it to "upload a file" will get you a ticket
 claude.ai then has no way to redeem. For claude.ai, the answer stays:
-download the file, then upload it from the backoffice
-(https://backoffice.nicolasdb.eu). Shell-capable clients (Claude Code, a
+download the file, then upload it from the backoffice of the person's
+instance. Shell-capable clients (Claude Code, a
 local script) are the only intended users of this tool.
 
 Chunked/multi-call append of a large file through tool arguments is
