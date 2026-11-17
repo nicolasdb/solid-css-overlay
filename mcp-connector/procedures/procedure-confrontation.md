@@ -1,9 +1,17 @@
-# Procédure de confrontation (v3)
+# Procédure de confrontation (v4)
 
 Exécutée par l'agent commun d'un collectif, avec **son** connecteur et lui
 seul pour écrire. Elle se lance après `procedure-pull.md`, qui produit les
 instantanés à confronter. En session claude.ai aujourd'hui ; quand Hermes
 prendra le relais, ce texte deviendra son instruction de routine.
+
+Changements depuis la v3 : les termes de `config.ttl` se lisent en `sc:`
+(`https://w3id.org/solid-collective/vocab#`) comme en `hs:` (ADR 006 §7, amendé
+le 2026-11-17), et l'agent est facultatif : la confrontation s'arrête (§0) quand
+`config.ttl` ne nomme aucun agent ou ne déclare pas `sc:Sharing`, car il n'y a
+alors ni pull, ni instantané, ni graphe. Les termes du pipeline que cette
+procédure écrit (`hs:Confrontation`, `hs:resultat`, `hs:tension`…) restent en
+`hs:` : `sc:` ne les a pas encore.
 
 Changements depuis la v2 : plus aucune adresse de collectif écrite en dur.
 La même procédure sert à tout collectif ; les adresses se lisent dans son
@@ -26,18 +34,30 @@ une nouvelle version d'un document est confrontée en sachant ce qui a changé.
 ## 0. Résoudre le collectif
 
 Lis le `config.ttl` du collectif. Le dossier qui le contient est la racine
-du pod du collectif (`<pod-collectif>/`). Le sujet `a hs:Collective` est son
-IRI (`<collectif>`) ; `hs:agent` est l'agent commun (`<agent-commun>`) ;
-`hs:roster` est la liste des membres.
+du pod du collectif (`<pod-collectif>/`). Ses termes se lisent en `sc:`
+comme en `hs:`, au même sens. Le sujet `a sc:Collective` (`a hs:Collective`
+dans un ancien `config.ttl`) est son IRI (`<collectif>`) ; `sc:agent` est
+l'agent commun (`<agent-commun>`) ; `sc:roster` est la liste des membres.
 
-**Vérifie que tu es bien `<agent-commun>`** (le WebID de ton connecteur).
-Sinon, arrête-toi : cette procédure n'est pas pour toi, c'est
-`procedure-contribution.md` qui s'applique.
+**Arrête-toi, sans rien écrire**, si :
+
+- `config.ttl` ne nomme aucun agent, ou, en `sc:`, ne déclare pas
+  `sc:feature sc:Sharing` : le collectif est d'adhésion seule, personne n'y
+  partage de dossier, rien n'a été tiré, il n'y a rien à confronter. Dis-le ;
+  ce n'est pas une erreur. Un ancien `config.ttl` (`hs:`) a le partage actif
+  sans rien déclarer ;
+- une propriété est donnée à la fois en `sc:` et en `hs:` : signale
+  l'incohérence, ne choisis pas ;
+- **tu n'es pas `<agent-commun>`** (le WebID de ton connecteur) : cette
+  procédure n'est pas pour toi, c'est `procedure-contribution.md` qui
+  s'applique.
 
 Dans la suite, `<pod-collectif>`, `<collectif>` et `<agent-commun>`
-désignent ces valeurs. Le préfixe `hs:`
-(`https://pod.nicolasdb.eu/hyperscope/vocab#`) est le vocabulaire commun
-provisoire, le même pour tous les collectifs : on ne le remplace pas.
+désignent ces valeurs. Les termes du pipeline (`hs:Confrontation`,
+`hs:resultat`, `hs:tension`…) sont en `hs:`
+(`https://pod.nicolasdb.eu/hyperscope/vocab#`), le vocabulaire provisoire,
+le même pour tous les collectifs, jusqu'à ce que `sc:` les ait : on ne
+remplace pas ce préfixe.
 
 ## Étapes
 

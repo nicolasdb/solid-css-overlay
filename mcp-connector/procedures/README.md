@@ -7,9 +7,9 @@ side, as the backoffice implements it on the member's and the admin's side.
 
 | Procedure | Version | Runs as | Does | Writes to |
 |---|---|---|---|---|
-| [`procedure-pull.md`](procedure-pull.md) | v2 | the collective's agent | follows what members announced, snapshots what changed | `depots/` only |
-| [`procedure-confrontation.md`](procedure-confrontation.md) | v3 | the collective's agent | reads each new snapshot against the collective's principles, describes it in a Turtle sidecar, loads the graph | `confrontations/` (report + sidecar, `sujets.ttl` append), `chantiers/` (append), the graph (`graph_ingest`) |
-| [`procedure-contribution.md`](procedure-contribution.md) | v3 | a member's own agent | draws on the collective's graph, deposits in `<dossier-partage>` citing what it builds on, reads the member's inbox | the member's own `<dossier-partage>` only |
+| [`procedure-pull.md`](procedure-pull.md) | v3 | the collective's agent | follows what members announced, snapshots what changed | `depots/` only |
+| [`procedure-confrontation.md`](procedure-confrontation.md) | v4 | the collective's agent | reads each new snapshot against the collective's principles, describes it in a Turtle sidecar, loads the graph | `confrontations/` (report + sidecar, `sujets.ttl` append), `chantiers/` (append), the graph (`graph_ingest`) |
+| [`procedure-contribution.md`](procedure-contribution.md) | v4 | a member's own agent | draws on the collective's graph, deposits in `<dossier-partage>` citing what it builds on, reads the member's inbox | the member's own `<dossier-partage>` only |
 
 **Why they live beside the connector** (moved from solid-kit
 `docs/procedures/` on 2026-10-16, with the `collectif` skill, now
@@ -19,7 +19,7 @@ ship in the same release. The protocol they implement, ADR 006, stays in
 solid-kit. What comes next for them (pull as code, any file format, a
 trigger): [`../docs/collective-pipeline.md`](../docs/collective-pipeline.md).
 
-The skill is v2 ([below](#skill-v2-2026-11-17)) and ships one text beside
+The skill is v2.1 ([below](#vocabulary-2026-11-17)) and ships one text beside
 it, [`creation.md`](../skills/collectif/creation.md), for an agent
 accompanying the person who creates a collective. It is the only text the
 skill does not read from a pod: no pod holds it before the collective
@@ -32,7 +32,8 @@ what it writes, and it is the only writer of its output.
 address. Each starts by resolving the collective (contribution: the
 member's `org:memberOf` → `config.ttl`, then the folder the member chose in
 their own `settings/collectives.ttl`; pull and confrontation: `config.ttl`,
-then a check that the connector's WebID is `hs:agent`, stopping otherwise).
+then a check that it names an agent, shares, and that the connector's WebID is
+that agent, stopping otherwise).
 They are in French, were first run by hand from a claude.ai session with the
 agent's own connector (2026-09-24, see ADR 006, "Live evidence"), and are
 meant to guide Hermes or any other LLM agent as well: the protocol does not
@@ -45,14 +46,16 @@ What each procedure resolves at its step 0, and how the text names it:
 | In prose | In Turtle templates | What it is |
 |---|---|---|
 | `<pod-collectif>` | `<POD-COLLECTIF>` | the folder that holds `config.ttl` |
-| `<collectif>` | `<IRI-DU-COLLECTIF>` | the subject `a hs:Collective` (what members cite in `org:memberOf`) |
-| `<agent-commun>` | `<AGENT-COMMUN>` | `hs:agent` |
-| `<dossier-partage>` | `<URL-DU-DOSSIER-PARTAGE-DU-MEMBRE>` | contribution: `hs:folder` of the member's `settings/collectives.ttl` entry for `<collectif>` (solid-backoffice `docs/reference/collectives-file.md`); pull: `as:object` of the announcement. `hs:bundleFolder` is only the collective's suggestion |
+| `<collectif>` | `<IRI-DU-COLLECTIF>` | the subject `a sc:Collective`, or `a hs:Collective` in an older `config.ttl` (what members cite in `org:memberOf`) |
+| `<agent-commun>` | `<AGENT-COMMUN>` | `sc:agent` (`hs:agent` in an older one); optional, see [Vocabulary](#vocabulary-2026-11-17) |
+| `<dossier-partage>` | `<URL-DU-DOSSIER-PARTAGE-DU-MEMBRE>` | contribution: `sc:folder` (`hs:folder` in an older file) of the member's `settings/collectives.ttl` entry for `<collectif>` (solid-backoffice `docs/reference/collectives-file.md`); pull: `as:object` of the announcement. `sc:suggestedFolder` (was `hs:bundleFolder`) is only the collective's suggestion |
 | — | `<NOM-DU-COLLECTIF>` | `foaf:name` of the collective in `config.ttl` |
 
 Uppercase marks a value to substitute inside Turtle, where `<…>` is already
-an IRI. The `hs:` prefix is **not** a placeholder: it is the same for every
-collective ([open](#open)).
+an IRI. A prefix is **not** a placeholder: it is the same for every
+collective. New documents use `sc:`, old ones keep their `hs:`, and the
+pipeline's own terms stay `hs:` for now
+([Vocabulary](#vocabulary-2026-11-17)).
 
 ## Copied, not shared
 
@@ -64,7 +67,7 @@ first.
 
 **On the pod, procedures live beside the principles**, flat in
 `principles/` (`principles/procedure-*.md` next to `cultivate.md` or the
-collective's equivalent). `config.ttl` points there with `hs:procedures`, so
+collective's equivalent). `config.ttl` points there with `sc:procedures` (`hs:procedures` in an older one), so
 no agent writes the path in. The earlier `procedures/` folder is
 deprecated. Read only for the agent and the members, changed only by
 ceremony: a procedure is a rule the agent applies on the collective's
@@ -88,6 +91,59 @@ annexes without numbering them.
 collective's own choices, so another collective's copy can be compared
 against this reference. Each procedure carries its version in its title;
 how a copy learns it is behind is [open](#open).
+
+## Vocabulary, 2026-11-17
+
+[ADR 006 §7 was amended](https://github.com/nicolasdb/solid-kit/blob/main/docs/adr/006-membership-and-publication-by-pull.md#7-amended-2026-11-17-the-address-in-stages-the-agent-optional)
+the same day (vocabulary:
+[`docs/vocab/vocab.ttl`](https://github.com/nicolasdb/solid-kit/blob/main/docs/vocab/vocab.ttl)
+in solid-kit). The protocol's terms move to
+`https://w3id.org/solid-collective/vocab#` (`sc:`); documents written before
+keep `https://pod.nicolasdb.eu/hyperscope/vocab#` (`hs:`). Readers accept
+both, writers write `sc:` only. Here:
+
+| File | Before → after | Change |
+|---|---|---|
+| `procedure-pull.md` | v2 → v3 | §0 reads `config.ttl` in either vocabulary and **stops** when it names no agent, or (in `sc:`) does not declare `sc:feature sc:Sharing`: nothing is shared, so nothing to pull. `hs:bundleFolder` → `sc:suggestedFolder`. |
+| `procedure-confrontation.md` | v3 → v4 | The same §0 stop: no pull, no snapshot, no graph. |
+| `procedure-contribution.md` | v3 → v4 | §0 reads `config.ttl` and `settings/collectives.ttl` (`sc:SharedFolder`, `sc:collective`, `sc:folder`) in either vocabulary. A collective without Sharing has no shared folder and no graph: the agent says so and deposits nothing. |
+
+What the three share:
+
+- **Only the protocol terms moved**: the collective's description
+  (`Collective`, `roster`, `agent`, `confronter`, `feature`, `Sharing`,
+  `suggestedFolder`, `procedures`, `guide`, `requires`) and what a member's
+  pod keeps (`SharedFolder`, `collective`, `folder`; the backoffice's
+  `Followed` and its fields). The **pipeline's terms stay `hs:`**, in what the
+  procedures write: `declareePar`, `statut`, `remplaceePar`, `instantane`,
+  `fichier`, `cleSource`, `annonce`, `via`, the sources' and the
+  confrontation's own terms, the colours. They join `sc:` once running the
+  pipeline has settled them: adding a term is not a rename. The "never replace
+  the `hs:` prefix" rule of the earlier texts now reads: the pipeline's terms
+  stay `hs:`; for the rest, read both, write `sc:`.
+- **The agent is optional.** `sc:feature sc:Sharing` needs exactly one
+  `sc:agent`; without Sharing a collective is membership only (accepting
+  grants Read on the roster alone). An old `config.ttl` keeps its rule:
+  `hs:agent` and `hs:bundleFolder` required, sharing on without saying so.
+- **A property given in both vocabularies is refused**, by the connector
+  (`src/collectiveGraph.js`) and by the procedures, never merged: a guessed
+  agent is a grant to the wrong party. In the connector, `graph_ingest` on a
+  collective with no agent says there is no agent to ingest as, and
+  `graph_query` says there is no graph, before reading the roster.
+- **The `collectif` skill is v2.1** (`SKILL.md`, `creation.md` v1.1): the same
+  reading, the `config.ttl` draft in `sc:`, the membership half without an
+  agent (the earlier "future address" step is gone), the pipeline half adding
+  `sc:feature sc:Sharing` and `sc:agent`.
+- **Copies on pods.** A copy of the earlier versions keeps working on an
+  `hs:` `config.ttl`, which is all HyperScope and Maps of Making have until
+  their owners migrate them (ADR 006 §7, last step). It does **not** work on
+  an `sc:` one: it looks for `hs:agent`. So a new collective (OpenFab) copies
+  the new versions, and an existing one changes its copy by ceremony before
+  its `config.ttl` moves.
+
+Not done here: the w3id redirect (a pull request to `perma-id/w3id.org`;
+nothing dereferences the namespace), the backoffice's template, and each
+existing `config.ttl`.
 
 ## Skill v2, 2026-11-17
 
@@ -114,7 +170,8 @@ v1 → v2:
   the pipeline, opt-in (the agent, "May act for you", `hs:agent`, the
   agent's reads, `principles/`, `guide/`, the shared folders). `hs:agent` and
   `hs:bundleFolder` are still required by both parsers, so a
-  membership-only collective still names an agent's address.
+  membership-only collective still names an agent's address. (Lifted the same day:
+  [Vocabulary](#vocabulary-2026-11-17).)
 - **The common agent in a shared channel** (Matrix, Discord…) only greets.
   The person speaking acts as admin only in a session the admin opened; in
   a channel nobody does, so no pull or confrontation starts from there.
@@ -187,11 +244,12 @@ confirms) is still to be deliberated, alongside its principles.
 
 ## Open
 
-- **The `hs:` namespace** (`https://pod.nicolasdb.eu/hyperscope/vocab#`) is
-  hosted on one collective's pod but serves all of them. Proposed:
-  `https://w3id.org/solid-backoffice/vocab#`
-  ([ADR 006 §7](https://github.com/nicolasdb/solid-kit/blob/main/docs/adr/006-membership-and-publication-by-pull.md#7-vocabularies-one-generic-one-per-collective-added-2026-10-10)).
-  Until the migration runs: never replace it.
+- **The `hs:` namespace**: decided on 2026-11-17, no longer open. The
+  protocol's terms are `https://w3id.org/solid-collective/vocab#`; `hs:`
+  stays for the pipeline's terms until `sc:` adds them
+  ([ADR 006 §7, amended](https://github.com/nicolasdb/solid-kit/blob/main/docs/adr/006-membership-and-publication-by-pull.md#7-amended-2026-11-17-the-address-in-stages-the-agent-optional);
+  [above](#vocabulary-2026-11-17)). What stays open is the pipeline terms
+  themselves, and when HyperScope's and Maps of Making's `config.ttl` move.
 - **`schema:url`**, the invitation address in `config.ttl` (2026-11-17):
   agents read it, the backoffice ignores it. It is a protocol field all the
   same, and should be recorded in solid-kit ADR 006, beside `schema:slogan`.

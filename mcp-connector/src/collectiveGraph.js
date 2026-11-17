@@ -8,14 +8,17 @@
  *
  * Oxigraph has no access control of its own, so this module is the boundary:
  *
- * - Ingest: only the collective's agent (`hs:agent` in config.ttl), only
- *   Turtle it can read itself under the collective's `depots/` or
- *   `confrontations/`. One named graph per resource, named by its URL, and
- *   replaced (PUT) on every ingest, so ingesting twice never duplicates.
+ * - Ingest: only the collective's agent (`sc:agent`, or `hs:agent` in an older
+ *   config.ttl), only Turtle it can read itself under the collective's
+ *   `depots/` or `confrontations/`. One named graph per resource, named by its
+ *   URL, and replaced (PUT) on every ingest, so ingesting twice never
+ *   duplicates. A collective with no agent (membership only, ADR 006 §7
+ *   amended 2026-11-17) has no one to ingest as, and so no graph.
  *
  * - Query: the collective's own agent (it wrote what is there), a WebID the
- *   roster lists, or an agent a listed member declares with `acl:delegates`. The roster is read with the caller's own session, so
- *   someone who cannot read it is not a member. Read-only, and only over the
+ *   roster lists, or an agent a listed member declares with `acl:delegates`.
+ *   The roster is read with the caller's own session, so someone who cannot
+ *   read it is not a member. Read-only, and only over the
  *   collective's graphs under a folder the caller can read on the pod right
  *   now: the index never shows more than the pod does.
  *
@@ -51,7 +54,12 @@ const NS = {
   foaf: "http://xmlns.com/foaf/0.1/",
   acl: "http://www.w3.org/ns/auth/acl#",
   ldp: "http://www.w3.org/ns/ldp#",
-  // Provisional, like the backoffice's (src/lib/vocab.ts there): one line to move.
+  // The protocol's vocabulary (solid-kit ADR 006 §7, amended 2026-11-17;
+  // docs/vocab/vocab.ttl there). Writers write this one only.
+  sc: "https://w3id.org/solid-collective/vocab#",
+  // The provisional one that config.ttl files written before keep (HyperScope,
+  // Maps of Making). Read, never written: one line to drop when the last
+  // config is migrated.
   hs: "https://pod.nicolasdb.eu/hyperscope/vocab#",
 };
 
@@ -85,6 +93,58 @@ async function getTurtle(url, fetchFn) {
 /* ── The collective ──────────────────────────────────────────────────── */
 
 /**
+ * What a config.ttl says, from its triples; no network. `group` is the
+ * collective's IRI (`expected`, when the caller gave one with a fragment).
+ *
+ * Two vocabularies, one meaning (ADR 006 §7 amended 2026-11-17). The terms
+ * are read in `sc:` and in `hs:` alike. A config that gives the same property
+ * in both is refused, never merged: for `agent` the choice would be a guess,
+ * and a guessed agent is a grant to the wrong party.
+ *
+ * What the agent means depends on the document's own vocabulary:
+ * - `a sc:Collective`: the agent is optional. `sc:feature sc:Sharing` (members
+ *   share a folder with the agent) needs exactly one. Without Sharing the
+ *   collective is membership only: no agent, nothing pulled, no graph.
+ * - `a hs:Collective` alone: the old rule, exactly one `hs:agent`, sharing on.
+ */
+function readCollectiveConfig(quads, configUrl, expected) {
+  const declared = (cls) =>
+    quads.filter((q) => q.predicate.value === NS.rdf + "type" && q.object.value === NS[cls] + "Collective").map((q) => q.subject.value);
+  const sc = declared("sc");
+  const hs = declared("hs");
+  const all = [...new Set([...sc, ...hs])];
+  const group = expected ? all.find((d) => d === expected) : all.length === 1 ? all[0] : null;
+  if (!group) throw refusal(`${configUrl} does not declare ${expected ? expected : "exactly one"} sc:Collective (or hs:Collective in an older config).`);
+  const legacy = !sc.includes(group);
+
+  // The values of one property, from both vocabularies; refuses when both give it.
+  const values = (term) => {
+    const inSc = objectsOf(quads, group, NS.sc + term);
+    const inHs = objectsOf(quads, group, NS.hs + term);
+    if (inSc.length && inHs.length) {
+      throw refusal(
+        `${configUrl}: ${term} is given in both sc: and hs:. A config uses one vocabulary for each property, ` +
+          `so the connector will not guess which ${term} is meant. Keep one.`
+      );
+    }
+    return inSc.length ? inSc : inHs;
+  };
+
+  const rosters = values("roster");
+  if (rosters.length !== 1) throw refusal(`${configUrl}: expected exactly one sc:roster (hs:roster in an older config), found ${rosters.length}.`);
+
+  const agents = values("agent");
+  const sharing = legacy || objectsOf(quads, group, NS.sc + "feature").includes(NS.sc + "Sharing");
+  if (agents.length > 1) throw refusal(`${configUrl}: expected at most one agent, found ${agents.length}.`);
+  if (legacy && agents.length !== 1) throw refusal(`${configUrl}: expected exactly one hs:agent, found ${agents.length}.`);
+  if (sharing && !legacy && agents.length !== 1) {
+    throw refusal(`${configUrl}: sc:feature sc:Sharing needs exactly one sc:agent, found ${agents.length}.`);
+  }
+
+  return { configUrl, group, root: new URL("./", configUrl).href, roster: rosters[0], agent: agents[0] || null, sharing, vocabulary: legacy ? "hs" : "sc" };
+}
+
+/**
  * The collective from its address: its IRI (`…/config.ttl#hyperscope`, what a
  * member's `org:memberOf` holds) or the config document's URL.
  */
@@ -106,24 +166,7 @@ async function loadCollective(address, fetchFn) {
     if (err.statusCode === 401) throw err;
     throw refusal(`Could not read the collective's config at ${configUrl}: ${err.message}`);
   }
-  const declared = quads
-    .filter((q) => q.predicate.value === NS.rdf + "type" && q.object.value === NS.hs + "Collective")
-    .map((q) => q.subject.value);
-  const group = expected ? declared.find((d) => d === expected) : declared.length === 1 ? declared[0] : null;
-  if (!group) throw refusal(`${configUrl} does not declare ${expected ? expected : "exactly one"} hs:Collective.`);
-
-  const one = (predicate, label) => {
-    const values = objectsOf(quads, group, predicate);
-    if (values.length !== 1) throw refusal(`${configUrl}: expected exactly one ${label}, found ${values.length}.`);
-    return values[0];
-  };
-  return {
-    configUrl,
-    group,
-    root: new URL("./", configUrl).href,
-    roster: one(NS.hs + "roster", "hs:roster"),
-    agent: one(NS.hs + "agent", "hs:agent"),
-  };
+  return readCollectiveConfig(quads, configUrl, expected);
 }
 
 /** The folders of this collective that are indexed, as full URLs. */
@@ -147,7 +190,7 @@ async function authorizeReader(collective, webId, fetchFn, now = Date.now()) {
 
   // The collective's own agent: it pulled, confronted and loaded all of it, so
   // reading it back shows it nothing new. The folder check below still applies.
-  if (webId === collective.agent) return readableFolders(collective, webId, fetchFn, key, now, collective.group);
+  if (collective.agent && webId === collective.agent) return readableFolders(collective, webId, fetchFn, key, now, collective.group);
 
   let members;
   try {
@@ -299,6 +342,16 @@ function formatResult(queryType, raw) {
 async function queryGraph({ collective: address, query }, identity) {
   const fetchFn = identity.session.fetch;
   const collective = await loadCollective(address, fetchFn);
+  if (!collective.agent) {
+    // Only the agent's ingest fills the graph, and what it loads (depots/,
+    // confrontations/) is what a pull writes, which needs Sharing. Answering
+    // would read the roster and every member's profile to end on "can read
+    // none of" or an empty table: say why there is nothing instead.
+    throw refusal(
+      `${collective.group} declares no agent (no sc:agent) and no sc:feature sc:Sharing: it is membership only, ` +
+        "so nothing is pulled and no graph is built. There is nothing to query."
+    );
+  }
   const checked = checkQuery(query);
   const reader = await authorizeReader(collective, identity.webId, fetchFn);
   const graphs = await graphsUnder(reader.folders);
@@ -348,6 +401,12 @@ async function ingestOne(url, fetchFn) {
 async function ingest({ collective: address, url }, identity) {
   const fetchFn = identity.session.fetch;
   const collective = await loadCollective(address, fetchFn);
+  if (!collective.agent) {
+    throw refusal(
+      `${collective.group} declares no agent (no sc:agent), so there is no agent to ingest as. ` +
+        "A collective without sc:feature sc:Sharing is membership only: nothing is pulled, so there is nothing to load."
+    );
+  }
   if (identity.webId !== collective.agent) {
     throw refusal(`Only the collective's agent (${collective.agent}) ingests into its graph; this identity is ${identity.webId}.`);
   }
@@ -379,6 +438,8 @@ async function ingest({ collective: address, url }, identity) {
 module.exports = {
   INGESTABLE,
   MAX_ROWS,
+  NS,
+  readCollectiveConfig,
   loadCollective,
   authorizeReader,
   forgetReaders,

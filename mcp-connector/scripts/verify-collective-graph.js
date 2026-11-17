@@ -34,11 +34,19 @@ const NICOLAS_CLAUDE = "https://pod.example/nicolas/profile/claude#me";
 const STRANGER_BOT = "https://pod.example/eve/profile/bot#me";
 const OUTSIDER = "https://pod.example/eve/profile/card#me";
 
+// HyperScope's config is in the old vocabulary (hs:, agent and bundleFolder
+// required), the other collective's in the new one (sc:, Sharing): the graph
+// reads both, and the isolation checks below run across the two.
 const config = (root, name, agent) => `
 @prefix hs: <https://pod.nicolasdb.eu/hyperscope/vocab#> . @prefix foaf: <http://xmlns.com/foaf/0.1/> .
 @prefix ldp: <http://www.w3.org/ns/ldp#> .
 <#${name}> a hs:Collective, foaf:Group ; foaf:name "${name}" ; hs:roster <membres.ttl> ;
   ldp:inbox <inbox/> ; hs:agent <${agent}> ; hs:bundleFolder "output2/${name}/" .`;
+const scConfig = (root, name, agent) => `
+@prefix sc: <https://w3id.org/solid-collective/vocab#> . @prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix ldp: <http://www.w3.org/ns/ldp#> .
+<#${name}> a sc:Collective, foaf:Group ; foaf:name "${name}" ; sc:roster <membres.ttl> ;
+  ldp:inbox <inbox/> ; sc:feature sc:Sharing ; sc:agent <${agent}> ; sc:suggestedFolder "shared/${name}/" .`;
 const listing = (children) =>
   `@prefix ldp: <http://www.w3.org/ns/ldp#>. <> a ldp:Container${children.length ? `; ldp:contains ${children.map((c) => `<${c}>`).join(", ")}` : ""}.`;
 const sidecar = (title, author) => `
@@ -66,7 +74,7 @@ const docs = {
     body: `<#me> <http://www.w3.org/ns/auth/acl#delegates> <claude#me> .`,
   },
   "https://pod.example/xavier/profile/card": { read: "*", body: `<#me> a <http://xmlns.com/foaf/0.1/Person> .` },
-  [OTHER + "config.ttl"]: { read: "*", body: config(OTHER, "other", OTHER_AGENT) },
+  [OTHER + "config.ttl"]: { read: "*", body: scConfig(OTHER, "other", OTHER_AGENT) },
   [OTHER + "membres.ttl"]: { read: [OTHER_AGENT], body: `<config.ttl#other> <http://xmlns.com/foaf/0.1/member> <${OUTSIDER}> .` },
   [OTHER + "depots/"]: { read: [OTHER_AGENT], body: listing(["secret.ttl"]) },
   [OTHER + "depots/secret.ttl"]: { read: [OTHER_AGENT], body: `<#s> <http://purl.org/dc/terms/title> "OTHER-SECRET" .` },
