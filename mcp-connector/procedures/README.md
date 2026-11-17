@@ -19,6 +19,12 @@ ship in the same release. The protocol they implement, ADR 006, stays in
 solid-kit. What comes next for them (pull as code, any file format, a
 trigger): [`../docs/collective-pipeline.md`](../docs/collective-pipeline.md).
 
+The skill is v2 ([below](#skill-v2-2026-11-17)) and ships one text beside
+it, [`creation.md`](../skills/collectif/creation.md), for an agent
+accompanying the person who creates a collective. It is the only text the
+skill does not read from a pod: no pod holds it before the collective
+exists.
+
 Each one is an input → process → output module: it names what it reads,
 what it writes, and it is the only writer of its output.
 
@@ -83,6 +89,48 @@ collective's own choices, so another collective's copy can be compared
 against this reference. Each procedure carries its version in its title;
 how a copy learns it is behind is [open](#open).
 
+## Skill v2, 2026-11-17
+
+From the review of one case: OpenFab, a fablab, registers on Maps of
+Making, turns its pod into a collective, then invites its members. The v1
+skill started from
+a `config.ttl` that already existed: it asked for one, stopped without
+`hs:procedures`, and knew two roles. It could neither help create a
+collective nor greet someone with no account. `skills/collectif/SKILL.md`
+v1 → v2:
+
+- **Accueil**, a third role: the person has no WebID, or the connector is
+  neither their agent nor `hs:agent`. The agent reads only what is public
+  (`config.ttl`, and `hs:guide`, now public as a whole), proposes one next
+  step from `onboarding.md`, gives the invitation address, and writes
+  nothing, not even to an inbox. It needs no right on any pod.
+- **Creation**: the person is setting up a collective whose `config.ttl` is
+  missing or incomplete → `creation.md`. An agent cannot do those writes, by
+  design: they need Control, and `config.ttl` must never be writable by the
+  agent it names. So the agent drafts `config.ttl` and checks from outside,
+  reads only; the person does each step in the backoffice, signed in as the
+  collective's account. Its table has two halves: membership (account,
+  inbox, `config.ttl` made public, `membres.ttl` with rules of its own) and
+  the pipeline, opt-in (the agent, "May act for you", `hs:agent`, the
+  agent's reads, `principles/`, `guide/`, the shared folders). `hs:agent` and
+  `hs:bundleFolder` are still required by both parsers, so a
+  membership-only collective still names an agent's address.
+- **The common agent in a shared channel** (Matrix, Discord…) only greets.
+  The person speaking acts as admin only in a session the admin opened; in
+  a channel nobody does, so no pull or confrontation starts from there.
+- **The invitation address** is read from `config.ttl`, `schema:url` (0–1,
+  schema.org like `schema:slogan`), never composed by an agent.
+- **A new invariant**: no agent writes a collective's `config.ttl` or a rule
+  (`.acl`), even on its own human's pod. The collective's own agent works
+  for the account that owns that pod, so "never write on someone else's
+  pod" did not cover it.
+
+The procedures are unchanged. Found on the way and corrected in
+solid-backoffice's how-to in the same pass: it named `agents/agent#me`
+(the backoffice creates agents at `profile/<name>#me`), and said creating
+the agent declares `acl:delegates` (that is "May act for you", a separate
+step on You).
+
 ## Contribution v3, 2026-10-16
 
 The member chooses the folder they share (solid-backoffice slice G); the
@@ -127,6 +175,11 @@ confirms) is still to be deliberated, alongside its principles.
 - **The backoffice's files.** The roster, `config.ttl` and the messages in
   `inbox/` are defined by `solid-backoffice` (`docs/reference/collective-files.md`,
   `docs/examples/`). When one changes there, the procedures are checked here.
+- **Creating a collective.** The backoffice's
+  `docs/how-to/set-up-a-collective.md` and `templates/collective/config.ttl`
+  now have a counterpart here, [`creation.md`](../skills/collectif/creation.md):
+  the same steps in the same two halves, the backoffice's labels, the same
+  `config.ttl`. When one changes, check the other.
 - **ADR 006 §3.** The snapshot path the procedures use,
   `depots/<nick>/<file-slug>/<AAAA-MM-JJTHHMM>/`, is what the live runs
   produced. ADR 006 §3 still says `<member-slug>/<bundle-slug>/<published>-<etag>/`.
@@ -139,6 +192,9 @@ confirms) is still to be deliberated, alongside its principles.
   `https://w3id.org/solid-backoffice/vocab#`
   ([ADR 006 §7](https://github.com/nicolasdb/solid-kit/blob/main/docs/adr/006-membership-and-publication-by-pull.md#7-vocabularies-one-generic-one-per-collective-added-2026-10-10)).
   Until the migration runs: never replace it.
+- **`schema:url`**, the invitation address in `config.ttl` (2026-11-17):
+  agents read it, the backoffice ignores it. It is a protocol field all the
+  same, and should be recorded in solid-kit ADR 006, beside `schema:slogan`.
 - **`access-log/` is deprecated** (EPIC9): read receipts move to a log
   server fed on `.acl` reads, consultable per account. The procedures are
   already neutral; `solid_read_resource`'s description in the connector
