@@ -1,10 +1,18 @@
-# Procédure de contribution (v3, côté membre)
+# Procédure de contribution (v4, côté membre)
 
 Pour l'agent **d'un membre** (son propre connecteur, pas celui du
 collectif), dans une conversation avec son humain. Elle dit comment
 s'appuyer sur ce que le collectif sait déjà, comment déposer une
 contribution, et quoi faire de l'inbox. C'est la moitié membre du cycle dont
 `procedure-pull.md` et `procedure-confrontation.md` sont la moitié collectif.
+
+Changements depuis la v3 : les termes du protocole se lisent en `sc:`
+(`https://w3id.org/solid-collective/vocab#`) comme en `hs:` (ADR 006 §7, amendé
+le 2026-11-17), dans `config.ttl` et dans `settings/collectives.ttl` ;
+`hs:bundleFolder` devient `sc:suggestedFolder`. Un collectif sans
+`sc:feature sc:Sharing` (adhésion seule) n'a ni dossier partagé ni graphe :
+tu le dis à ton humain et tu ne déposes rien. Les termes du pipeline
+(`hs:Vert`, `hs:resultat`…, annexe A) restent en `hs:`.
 
 Changements depuis la v2 : le dossier partagé est celui que ton humain a
 choisi, lu dans `settings/collectives.ttl` sur son pod (solid-backoffice,
@@ -30,30 +38,44 @@ traces, pas des déclarations.
 1. Lis le profil de ton humain. Chaque `org:memberOf` donne l'IRI d'un
    collectif (`<collectif>`), par exemple `…/config.ttl#nom`.
 2. Pour chacun, lis le document de cette IRI (`config.ttl`). Le dossier qui
-   le contient est la racine du pod du collectif (`<pod-collectif>/`). Tu y
+   le contient est la racine du pod du collectif (`<pod-collectif>/`). Ses
+   termes se lisent en `sc:` comme en `hs:`, au même sens ; une propriété
+   donnée dans les deux est une incohérence, signale-la sans choisir. Tu y
    trouves :
-   - `hs:agent` : l'agent commun (`<agent-commun>`) ;
-   - `hs:roster` : la liste des membres ;
+   - `sc:agent` : l'agent commun (`<agent-commun>`), s'il y en a un ;
+   - `sc:feature sc:Sharing` : le collectif reçoit des dossiers partagés.
+     Un ancien `config.ttl` (`hs:`) n'a pas cette ligne et partage quand
+     même ;
+   - `sc:roster` : la liste des membres ;
    - `ldp:inbox` : l'inbox du collectif ;
-   - `hs:bundleFolder` : le dossier que le collectif **suggère**, relatif au
-     pod de ton humain (par exemple `output2/<nom>/`). Ce n'est pas
-     forcément celui qu'il partage.
+   - `sc:suggestedFolder` (`hs:bundleFolder` dans un ancien) : le dossier
+     que le collectif **suggère**, relatif au pod de ton humain (par exemple
+     `shared/<nom>/`). Ce n'est pas forcément celui qu'il partage.
+   - **Sans partage** (`config.ttl` en `sc:` sans `sc:feature sc:Sharing`) :
+     le collectif est d'adhésion seule. Il n'a pas d'agent qui tire, donc pas
+     de dossier partagé, pas de dépôt, pas de graphe. Dis-le à ton humain,
+     ne dépose rien et n'appelle pas `graph_query` ; l'inbox (section 3)
+     reste la tienne.
 3. Trouve le dossier que ton humain partage avec ce collectif
    (`<dossier-partage>`). Lis `settings/collectives.ttl` à la racine de son
    pod (ton humain t'y donne la lecture en partageant) :
 
-       <#c-…> a hs:SharedFolder ;
-           hs:collective <collectif> ;
-           hs:folder     <https://…/son-pod/le-dossier/> .
+       <#c-…> a sc:SharedFolder ;
+           sc:collective <collectif> ;
+           sc:folder     <https://…/son-pod/le-dossier/> .
 
-   - **Une entrée** dont `hs:collective` est `<collectif>` : son
-     `hs:folder` est `<dossier-partage>`. Une adresse qui n'est pas un
+   Le backoffice écrit ces termes en `sc:` ; un fichier plus ancien les a
+   en `hs:` (`hs:SharedFolder`, `hs:collective`, `hs:folder`), à lire de
+   même.
+
+   - **Une entrée** dont `sc:collective` est `<collectif>` : son
+     `sc:folder` est `<dossier-partage>`. Une adresse qui n'est pas un
      dossier (sans `/` final) ou qui sort de son pod ne compte pas.
    - **Pas d'entrée, ou fichier absent (404)** : ton humain ne partage pas
      (ou plus) de dossier avec ce collectif, ou il l'a partagé avant que le
      backoffice ne note son choix. Ne dépose rien. Dis-le-lui, et propose
      de partager depuis le backoffice (Collectives → le collectif → Share).
-     `hs:bundleFolder` peut servir d'exemple, jamais d'adresse de dépôt.
+     `sc:suggestedFolder` peut servir d'exemple, jamais d'adresse de dépôt.
    - **Refus (403)** : tu n'as pas encore la lecture du fichier ; le
      backoffice la donne à tes agents quand ton humain partage. Dis-le, et
      ne devine pas le dossier.
@@ -180,8 +202,9 @@ Toutes passent par `graph_query`, avec `collective` = `<collectif>`. Le
 graphe ne contient que les dossiers que ton agent peut lire sur le pod du
 collectif ; un SELECT rend au plus 200 lignes.
 
-Le préfixe `hs:` (`https://pod.nicolasdb.eu/hyperscope/vocab#`) est le
-vocabulaire commun provisoire, le même pour tous les collectifs : on ne le
+Les termes du pipeline (`hs:confronte`, `hs:resultat`, `hs:Vert`…) sont en
+`hs:` (`https://pod.nicolasdb.eu/hyperscope/vocab#`), le vocabulaire provisoire,
+le même pour tous les collectifs, jusqu'à ce que `sc:` les ait : on ne le
 remplace pas par l'adresse de son propre pod.
 
 **Les sujets qui rassemblent** (où ça travaille, et combien de personnes) :

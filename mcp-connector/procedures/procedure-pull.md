@@ -1,10 +1,18 @@
-# Procédure — tirer les dépôts (pull, v2)
+# Procédure — tirer les dépôts (pull, v3)
 
-**Exécutée par** l'agent commun du collectif (`hs:agent` dans son `config.ttl`) :
+**Exécutée par** l'agent commun du collectif (`sc:agent` dans son `config.ttl`, `hs:agent` dans un ancien) :
 aujourd'hui depuis claude.ai, demain par Hermes.
 **Déclencheur** : « tire les dépôts annoncés » (ou « lance le pull »).
 **Référence** : ADR 006 du solid-kit (adhésion et publication par pull).
 **À la suite** : `procedure-confrontation.md`, sur les instantanés que ce pull vient de créer.
+
+Changements depuis la v2 : les termes de `config.ttl` se lisent en `sc:`
+(`https://w3id.org/solid-collective/vocab#`) comme en `hs:` (ADR 006 §7, amendé le
+2026-11-17) ; `hs:bundleFolder` devient `sc:suggestedFolder`, et reste une
+suggestion ; l'agent est facultatif, donc le pull s'arrête (étape 0) quand
+`config.ttl` ne nomme aucun agent ou ne déclare pas `sc:Sharing`. Les termes du
+pipeline que cette procédure écrit (`hs:declareePar`, `hs:statut`, `hs:fichier`…)
+restent en `hs:` : `sc:` ne les a pas encore.
 
 Changements depuis la v1 : plus aucune adresse de collectif écrite en dur ; l'historique
 propre à un collectif va dans une annexe de sa propre copie, sur son pod.
@@ -28,8 +36,8 @@ Tous les chemins sont relatifs à `<pod-collectif>/`, le dossier qui contient `c
 
 | Fichier | Rôle | Accès de l'agent |
 |---|---|---|
-| `config.ttl` | l'IRI du collectif, l'agent commun (`hs:agent`), le roster (`hs:roster`), l'inbox (`ldp:inbox`), le dossier partagé (`hs:bundleFolder`) | lecture |
-| le roster (`hs:roster`, aujourd'hui `membres.ttl`) | qui est membre (reconnu par le collectif) et son nom court, rien d'autre | lecture |
+| `config.ttl` | l'IRI du collectif, l'agent commun (`sc:agent`), le partage (`sc:feature sc:Sharing`), le roster (`sc:roster`), l'inbox (`ldp:inbox`), le dossier suggéré (`sc:suggestedFolder`) | lecture |
+| le roster (`sc:roster`, aujourd'hui `membres.ttl`) | qui est membre (reconnu par le collectif) et son nom court, rien d'autre | lecture |
 | profil de chaque membre | son nom, son agent (`acl:delegates`), et s'il déclare toujours `org:memberOf` | lecture (public) |
 | l'inbox (`ldp:inbox`) | annonces `as:Announce` envoyées par les membres | lecture |
 | `depots/sources.ttl` | les sources suivies, leur statut, les annonces déjà traitées | écriture |
@@ -41,13 +49,24 @@ Si `depots/sources.ttl` n'existe pas encore, on le crée à partir du modèle en
 
 ### 0. Vérifier son rôle
 
-Lire `config.ttl`. Si le WebID de ton connecteur n'est pas `hs:agent`, arrête-toi : cette
-procédure n'est pas pour toi.
+Lire `config.ttl`. Ses termes se lisent en `sc:` comme en `hs:`, au même sens (`sc:agent`
+est aussi `hs:agent`). Arrête-toi, sans rien écrire, dans ces cas :
+
+- **le collectif ne nomme aucun agent**, ou, dans un `config.ttl` en `sc:`, ne déclare pas
+  `sc:feature sc:Sharing` : il est d'adhésion seule, personne n'y partage de dossier, il n'y a
+  rien à tirer. Dis-le, et que ce n'est pas une erreur. Un ancien `config.ttl` (`hs:`) a le
+  partage actif sans rien déclarer ;
+- **une propriété est donnée à la fois en `sc:` et en `hs:`** : c'est une incohérence que
+  personne ici ne tranche. Signale-la ;
+- **le WebID de ton connecteur n'est pas l'agent** (`sc:agent`, ou `hs:agent`) : cette
+  procédure n'est pas pour toi.
 
 ### 1. Lire l'état
 
-- Dans `config.ttl` : l'IRI du collectif est le sujet `a hs:Collective` (`<collectif>`) ;
-  le dossier partagé est `hs:bundleFolder`. Ne pas les écrire en dur.
+- Dans `config.ttl` : l'IRI du collectif est le sujet `a sc:Collective` (ou `a hs:Collective`,
+  dans un ancien) (`<collectif>`). Ne pas l'écrire en dur. `sc:suggestedFolder` (`hs:bundleFolder`
+  dans un ancien) n'est qu'une suggestion du collectif : une source, c'est ce que le membre
+  annonce (`as:object`), jamais ce dossier.
 - Lire le roster pour savoir qui est reconnu (`<collectif> foaf:member <WebID>`) et sous quel
   nom court (`<WebID> foaf:nick`). Le roster ne contient ni noms ni agents : ils se lisent dans
   le profil de chaque membre. **Un `foaf:nick` sans `foaf:member` correspondant n'est pas un
@@ -208,8 +227,10 @@ Enchaîner ensuite `procedure-confrontation.md` sur les instantanés créés. Un
 
 ## Annexe A — modèle de `provenance.ttl`
 
-Remplacer `<AGENT-COMMUN>` par `hs:agent` de `config.ttl`. Le préfixe `hs:` est le vocabulaire
-commun provisoire, le même pour tous les collectifs : on ne le remplace pas.
+Remplacer `<AGENT-COMMUN>` par `sc:agent` de `config.ttl` (`hs:agent` dans un ancien). Les
+termes du pipeline (`hs:via`, `hs:fichier`, `hs:cleSource`, `hs:annonce`…) restent en `hs:`,
+le préfixe provisoire de `https://pod.nicolasdb.eu/hyperscope/vocab#` : `sc:` ne les a pas
+encore, et ce préfixe est le même pour tous les collectifs, on ne le remplace pas.
 
 ```turtle
 @prefix prov:    <http://www.w3.org/ns/prov#> .
