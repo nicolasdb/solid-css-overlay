@@ -4,6 +4,31 @@ Versions are `<stock CSS version>-<n>`: a new stock release starts at `-1`, a
 new overlay on the same stock adds one. A tag `v<version>` publishes both
 images (`.github/workflows/build.yml`).
 
+## 7.3.0-5 — 2026-11-18
+
+On stock CSS 7.3.0. **The connector reads collectives in the new vocabulary**
+(solid-kit ADR 006 §7, amended 2026-11-17). An instance updates the image;
+nothing to change in `.env` but the version. The pages and the server are
+unchanged: only the connector image differs.
+
+- **`sc:` and `hs:`** (#43). A collective's `config.ttl` is read in
+  `https://w3id.org/solid-collective/vocab#` as well as the old
+  `https://pod.nicolasdb.eu/hyperscope/vocab#`; `hs:bundleFolder` is now
+  `sc:suggestedFolder`. A property given in both namespaces is refused,
+  naming both, rather than one picked.
+- **The agent is optional.** A collective with no `sc:agent` and no
+  `sc:feature sc:Sharing` is membership only: `graph_ingest` and
+  `graph_query` refuse it with that reason. An old `hs:` config still needs
+  its `hs:agent`, as before.
+- **Not in the image, copied by hand** (#42, #43, #44): the `collectif` skill
+  v2.1 with its new `creation.md` (a third role, greeting, and a creation
+  branch for a collective that does not exist yet), and the procedures pull
+  v3, confrontation v4, contribution v4, which stop on a membership-only
+  collective. Upload the skill where your agents load it; copy the procedures
+  into a collective's `principles/` by ceremony.
+- Tests: 14 new cases in `mcp-connector/test/collectiveGraph.test.js`
+  (both namespaces, mixed duplicates, no agent).
+
 ## 7.3.0-4 — 2026-11-03
 
 On stock CSS 7.3.0. **The image's second component** (solid-kit ADR 012). An
