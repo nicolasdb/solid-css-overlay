@@ -8,6 +8,24 @@ connector, and the connector is built here, not in pocpod0.
 Order agreed: **A → B → D → C.** Until C, pull and confrontation still run by
 hand, from claude.ai or Hermes.
 
+## Vocabulary
+
+The protocol's terms (`sc:Collective`, `sc:roster`, `sc:agent`,
+`sc:confronter`, `sc:feature`, `sc:Sharing`, `sc:suggestedFolder`,
+`sc:procedures`, `sc:guide`) are in `sc:` =
+`https://w3id.org/solid-collective/vocab#` (solid-kit ADR 006 §7, amended
+2026-11-17). New documents are written in `sc:`; the old `hs:`
+(`https://pod.nicolasdb.eu/hyperscope/vocab#`) is still read, and
+`hs:bundleFolder` is now `sc:suggestedFolder`. The pipeline's own terms
+(`hs:declareePar`, `hs:statut`, `hs:instantane`, the colours...) stay in
+`hs:` until a later vocabulary version.
+
+**The agent is optional.** `sc:agent` is declared only with
+`sc:feature sc:Sharing`, which requires exactly one. A collective without
+Sharing is "membership only": no pull, no confrontation, no graph. Everything
+below applies to collectives with Sharing; for the others the pipeline stops
+at its first step, before reading anything.
+
 ## Where we are
 
 - **Nothing runs on its own.** Pull and confrontation
@@ -41,22 +59,22 @@ That splits the collective's side in two:
 
 | Who | WebID | Holds | Does |
 |---|---|---|---|
-| the **puller** (code, in this connector) | `hs:agent`, the one members grant Read to | Read on members' shared folders; Read `inbox/`, `confrontations/`; Write `depots/` | follows announcements, snapshots, writes derived text, loads the graph |
-| the **confronter** (LLM: Hermes, or claude.ai by hand) | its own, declared `hs:confronter` | Read `depots/`, `principles/`; Write `confrontations/`, `chantiers/` | confronts, writes report + sidecar |
+| the **puller** (code, in this connector) | `sc:agent`, the one members grant Read to | Read on members' shared folders; Read `inbox/`, `confrontations/`; Write `depots/` | follows announcements, snapshots, writes derived text, loads the graph |
+| the **confronter** (LLM: Hermes, or claude.ai by hand) | its own, declared `sc:confronter` | Read `depots/`, `principles/`; Write `confrontations/`, `chantiers/` | confronts, writes report + sidecar |
 
 - **Members grant one WebID, once.** Changing which LLM confronts, or
   running two, never asks members to grant again: the confronter's rights
   are on the collective's pod, given by its admin.
 - **Settled in solid-kit ADR 006 §8** (2026-10-17): the confronter is
-  declared `hs:confronter` in `config.ttl`; the graph is loaded by code as
-  `hs:agent` after each confrontation; the sidecar's subject is the
+  declared `sc:confronter` in `config.ttl`; the graph is loaded by code as
+  `sc:agent` after each confrontation; the sidecar's subject is the
   original in its snapshot, its `dcterms:creator` the member. Other LLM
   agents (a Discord bot) get rights on the collective's pod only, by
   audience, and are never in members' rules.
 
 ## A. Pull as code
 
-A connector feature acting as `hs:agent`, with no LLM in the path:
+A connector feature acting as `sc:agent`, with no LLM in the path:
 
 - **`solid_snapshot(source, target)`**, the primitive: GET with the agent's
   own credentials, PUT the same bytes with the same `Content-Type`, return
@@ -113,7 +131,7 @@ poll as fallback. With the pull as code, the connector receives them
 itself:
 
 1. **The collective's `inbox/`.** The puller subscribes to it as
-   `hs:agent` (container topic: `Add`). On each `Add`, it GETs the new item
+   `sc:agent` (container topic: `Add`). On each `Add`, it GETs the new item
    with its own credentials (the notification's body is never trusted). An
    `as:Announce` from a member or a member's declared agent: record the
    source, subscribe to it, pull it now. An `as:Undo`: mark it and
@@ -141,5 +159,5 @@ subscriptions that survive a restart (stored, re-created at boot).
 ## Elsewhere, when this starts
 
 - **solid-backoffice**: the summary before sharing (D).
-- **Each collective's pod copy** of the procedures (`hs:procedures`):
+- **Each collective's pod copy** of the procedures (`sc:procedures`):
   updated by its admin when pull v3 ships.
