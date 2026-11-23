@@ -63,6 +63,18 @@ jobs:
       - name: instance-template/update.sh parses
         run: bash -n instance-template/update.sh
 
+      # css-patches/ (solid-kit ADR 014): the image must have the #2297 fix,
+      # and stock 7.3.0 must fail the same test, or the test proves nothing.
+      - name: CSS #2297 lock fix, in the image and missing from stock
+        run: |
+          docker run --rm -v "$PWD/test:/t:ro" --entrypoint node solid-css-overlay:dev /t/lock-wrapper.cjs
+          stock="docker.io/solidproject/community-server:$(sed -n 's/^ARG CSS_VERSION=//p' Dockerfile)"
+          set +e
+          timeout 120 docker run --rm -v "$PWD/test:/t:ro" --entrypoint node "$stock" /t/lock-wrapper.cjs
+          code=$?
+          set -e
+          [ "$code" = 2 ] || { echo "stock should fail with exit 2 (bug reproduced), got $code"; exit 1; }
+
       - name: stock templates unchanged since the overlay was reconciled
         run: scripts/check-overrides.sh
 

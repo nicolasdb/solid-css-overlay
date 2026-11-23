@@ -1,0 +1,54 @@
+# Weekly: is the upstream fix for CSS issue #2297 out, so css-patches/ can go?
+# (solid-kit ADR 014: the patch is removed in the first image built on a CSS
+# release that contains PR #2298.) Opens one issue, then comments on it when
+# what it knows changes. Stops by itself once css-patches/ is gone.
+name: upstream-fix-watch
+
+on:
+  schedule:
+    - cron: "41 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          UP: CommunitySolidServer/CommunitySolidServer
+        run: |
+          [ -d css-patches ] || { echo "css-patches/ is gone: nothing to watch"; exit 0; }
+          ours="$(sed -n 's/^ARG CSS_VERSION=//p' Dockerfile)"
+          merged="$(gh api "repos/$UP/pulls/2298" --jq '.merged')"
+          sha="$(gh api "repos/$UP/pulls/2298" --jq '.merge_commit_sha // empty')"
+          latest="$(gh api "repos/$UP/releases/latest" --jq .tag_name)"
+          npm_latest="$(npm view @solid/community-server version 2>/dev/null || echo '?')"
+          contains=no
+          if [ "$merged" = true ] && [ -n "$sha" ]; then
+            status="$(gh api "repos/$UP/compare/$latest...$sha" --jq .status || echo unknown)"
+            # behind or identical: the merge commit is already in the release.
+            case "$status" in behind|identical) contains=yes ;; esac
+          fi
+          echo "image on $ours; PR #2298 merged=$merged; latest release $latest (npm $npm_latest); release contains fix: $contains"
+          [ "$merged" = true ] || [ "${latest#v}" != "$ours" ] || exit 0
+          title="Upstream fix for #2297 released: drop the patch"
+          state="PR #2298 merged: $merged. Latest CSS release: $latest (npm: $npm_latest). That release contains the fix: $contains."
+          body="$(printf '%s\n' \
+            "$state" \
+            "" \
+            "css-patches/ carries upstream PR #2298 on CSS 7.3.0 (solid-kit ADR 014). When a release contains it:" \
+            "1. Bump CSS_VERSION (stock-watch's issue has the steps)." \
+            "2. Delete css-patches/, its RUN step in the Dockerfile, the lock-wrapper step in build.yml, the CSS_PATCHES arg in stock-watch.yml, and this workflow." \
+            "3. Keep test/lock-wrapper.cjs if it still runs against the new stock: it should now pass on stock too." \
+            "" \
+            "A release newer than $ours without the fix: keep the patch, re-port it if the stock file changed (the build fails until then).")"
+          num="$(gh issue list --state open --search "\"$title\" in:title" --json number,title --jq ".[] | select(.title == \"$title\") | .number" | head -1)"
+          if [ -z "$num" ]; then gh issue create --title "$title" --body "$body"; exit 0; fi
+          last="$(gh issue view "$num" --json body,comments --jq '[.body] + [.comments[].body] | last')"
+          grep -qF "$state" <<<"$last" && { echo "issue #$num already says this"; exit 0; }
+          gh issue comment "$num" --body "$body"

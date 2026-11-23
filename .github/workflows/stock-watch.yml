@@ -69,7 +69,9 @@ jobs:
       - name: the image builds on it
         id: build
         continue-on-error: true
-        run: docker build --build-arg CSS_VERSION="$TAG" -t "solid-css-overlay:$TAG" .
+        # CSS_PATCHES=skip: css-patches/ only fits 7.3.0 and refuses any other
+        # stock file (solid-kit ADR 014); upstream-fix-watch.yml watches it.
+        run: docker build --build-arg CSS_VERSION="$TAG" --build-arg CSS_PATCHES=skip -t "solid-css-overlay:$TAG" .
       - name: browser for the smoke run
         if: steps.build.outcome == 'success'
         working-directory: test

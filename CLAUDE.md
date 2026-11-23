@@ -12,7 +12,10 @@ connector, as two published images. An instance (Maps of Making, pod.nicolasdb.e
 pins a version and mounts its own `overlay/`. **A feature every instance will
 get is built here**, not in an instance.
 
-CSS is never patched. The image adds files where stock CSS looks for them
+CSS is never patched, with one temporary exception: `css-patches/` carries
+upstream PR #2298 on CSS 7.3.0 (the hourly lock crash, solid-kit ADR 014),
+and goes with the first CSS release that has it. The build refuses any other
+stock file. The image adds files where stock CSS looks for them
 (`templates/`), one config, and two components: `pod-name-guard/` and
 `account-admin/` (solid-kit ADR 012). Adding another is a decision to write
 down (an ADR in solid-kit), not a commit: every component is code to carry

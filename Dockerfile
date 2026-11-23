@@ -3,7 +3,8 @@
 # Tag: <stock version>-<n> (7.2.0-1). A new stock release is a new 7.x.y-1;
 # a new overlay on the same stock is -n+1. See CHANGELOG.md.
 #
-# Nothing in CSS is patched. The image only adds files where stock CSS already
+# Nothing in CSS is patched, with one temporary exception (css-patches/,
+# solid-kit ADR 014). The image only adds files where stock CSS already
 # looks for them (templates/), one config, and two components (PodNameGuard,
 # and AccountAdminHandler: solid-kit ADR 012) with its terminal tool (admin/).
 ARG CSS_VERSION=7.3.0
@@ -42,6 +43,21 @@ RUN npm test
 
 FROM solidproject/community-server:${CSS_VERSION}
 WORKDIR /community-server
+
+# The one exception to "CSS is never patched" (solid-kit ADR 014): CSS 7.3.0's
+# LockingResourceStore with exactly the fix of upstream PR #2298 (issue #2297).
+# Without it the hourly cleanup of expired login sessions stalls on a lock and
+# the server stops. The build FAILS unless the stock file is exactly 7.3.0's
+# (css-patches/stock.sha256): a CSS bump must look at the patch, and drop it
+# once a release has the fix. CSS_PATCHES=skip only for the stock-watch
+# "ahead" builds on edge/next, whose file is not 7.3.0's.
+# The patched file stays in /opt/css-patches/ so a server can check it is live.
+ARG CSS_PATCHES=apply
+COPY css-patches/ /opt/css-patches/
+RUN if [ "$CSS_PATCHES" = skip ]; then echo "css-patches: skipped"; exit 0; fi; \
+    grep -v '^#' /opt/css-patches/stock.sha256 | sha256sum -c - \
+      || { echo "css-patches: the stock file is not CSS 7.3.0's; see solid-kit ADR 014"; exit 1; }; \
+    cp /opt/css-patches/2297-lock-wrapper/LockingResourceStore.js dist/storage/LockingResourceStore.js
 
 # The components go where Components.js discovers modules (node_modules under the
 # main module path). At runtime it requires @solid/community-server, which in

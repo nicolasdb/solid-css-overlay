@@ -6,6 +6,16 @@ images (`.github/workflows/build.yml`).
 
 ## Unreleased
 
+- **The server no longer stops every hour** (CSS issue #2297). Stock CSS
+  7.3.0 stalls on a lock when it cleans up expired login sessions, then
+  crashes with `TypeError: callback is not a function`. The image now carries
+  exactly the upstream fix, PR #2298 (open, not released), in
+  `css-patches/`: the only change to CSS itself, temporary, decided in
+  solid-kit ADR 014. The build fails if the stock file is not 7.3.0's. CI
+  runs `test/lock-wrapper.cjs` on the image (must pass) and on stock (must
+  fail). A weekly workflow (`upstream-fix-watch.yml`) opens an issue when a
+  CSS release has the fix, so the patch can be dropped.
+
 - **The root container is public read only** (#47). The image now writes
   `overlay/root/.acl` (public `acl:Read` on the root, `accessTo` and
   `default`) where stock CSS took its root `.acl`, which gave the public
