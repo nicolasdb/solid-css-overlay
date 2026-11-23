@@ -41,7 +41,8 @@
         "before 7.2.0-1. Mount it over /config.json. Same as instance.json except: pods stay folders",
         "(util/identifiers/suffix.json, never switched on an existing instance, see instance.json), and no",
         "PodNameGuard, whose hostname rule would refuse names such instances already use (nicolas_claude).",
-        "The welcome page is the root container index.html here too: written once, on first start."
+        "The welcome page is the root container index.html here too: written once, on first start, with",
+        "the image's root .acl (public read only, overlay/root/.acl, docs/root-acl.md)."
       ]
     },
     {

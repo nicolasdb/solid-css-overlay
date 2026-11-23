@@ -27,6 +27,7 @@ there, only without this overlay's extras.
 | **Accounts can be listed and deleted** | From the server's terminal: `scripts/admin.sh` opens a TUI that lists every account, then sorts, filters, selects and deletes them with their pods. The pod names come free again. Stock CSS does neither. [`docs/admin/`](docs/admin/README.md) |
 | **Authentication is stock** | DPoP and Bearer only. pocpod0's `UnsecureWebIdExtractor` is not in the image. |
 | **The welcome page** | Ours, or the vertical's from its design-system repo, put at the root at every start (`start/welcome.js`). |
+| **The root is public read only** | The root `.acl` written on first start (`overlay/root/.acl`) lets the public read the root, not write to it. Stock gives the public Read, Write, Append and Control there. First start only: an older instance fixes its own, [`docs/root-acl.md`](docs/root-acl.md). |
 | **The README a new pod starts with** | Ours: what is in the pod, what is public, how sharing and agents work, no Databrowser. Or the vertical's, from the same repo. |
 | **CSS itself** | Untouched. Files are added where stock CSS already looks (`templates/`), plus one config and two components (solid-kit ADR 012 says why the second). |
 
@@ -278,6 +279,10 @@ says it runs the new version. If any of that fails, it goes back to the
 version it started from the same way. `-y` skips the question, and stops
 instead of losing a welcome page. The data volume is never touched. Its
 header has the first run, on a checkout older than the script.
+
+An update never changes the root `.acl`: CSS writes it on first start only.
+An instance created before the read-only root (#47) fixes it once by hand,
+[`docs/root-acl.md`](docs/root-acl.md).
 
 By hand, it is: `git fetch --tags && git checkout v<new>`, the same version
 as `CSS_OVERLAY_VERSION` in `instance-template/.env`, then

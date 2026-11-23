@@ -80,6 +80,7 @@ jobs:
         run: |
           test/try-local.sh 3123
           node test/smoke.mjs http://localhost:3123 test/shots/subdomain
+          test/root-acl.sh 3123
           test/welcome-restart.sh 3123
           docker rm -f try-css-overlay-3123
 
@@ -88,6 +89,7 @@ jobs:
         run: |
           test/try-local.sh 3124
           node test/smoke.mjs http://localhost:3124 test/shots/suffix
+          test/root-acl.sh 3124
           test/welcome-restart.sh 3124
 
       - name: screenshots
