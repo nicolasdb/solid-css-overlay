@@ -376,7 +376,7 @@ The skin audit (contrast, complete slot set) lives in solid-kit:
 | `overlay-template/` | what the `pods/` folder of a vertical's design-system repo starts from (ADR 011) |
 | `start/` | the image's entrypoint: writes `provider.json`, `pod-layout.js`, the email sender, the admin route and the welcome page, then runs stock CSS |
 | `gateway-caddy/` | Caddy + the OVH DNS module, for the wildcard certificate |
-| `docs/` | `admin/` (account admin: tutorial, how-to, reference, explanation), `faq.md` (sign-in lifetimes, consent), install briefs for one VPS (`handoff-mapsofmaking.md`, `handoff-pocpod0.md`) |
+| `docs/` | `admin/` (account admin: tutorial, how-to, reference, explanation), `collectives/` (a collective's own account, WebID on its domain, pod), `faq.md` (sign-in lifetimes, consent), install briefs for one VPS (`handoff-mapsofmaking.md`, `handoff-pocpod0.md`) |
 | `ROADMAP.md` | planned features: the account manager page, the right to erasure |
 | `mcp-connector/` | the connector's source and image |
 | `skills/css-instance/` | the method, for Claude Code; never required |
