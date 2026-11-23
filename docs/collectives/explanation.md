@@ -11,7 +11,7 @@ Community Solid Server 7.3 keeps three separate things:
   WebID does not have to live on this server: it can be a small Turtle file on
   the collective's own domain (tier 1), which only has to say which server
   signs it in (`solid:oidcIssuer`) and where its data is (`pim:storage`).
-- **A pod** is storage, for example `https://openfab.pods.syntonie.be/`. An
+- **A pod** is storage, for example `https://openfab.pod.syntonie.be/`. An
   account can create several. Each pod remembers the account that created it,
   and has a list of **owners**: WebIDs that always have full control over it.
 
@@ -54,7 +54,7 @@ Who holds OpenFab's keys (which email, which people) is the collective's
 business: a proposal for the makers' council, not a server setting. This
 layout only keeps every answer open.
 
-## The setup on pods.syntonie.be
+## The setup on pod.syntonie.be
 
 | Account | WebID | Pod | Extra owner |
 |---|---|---|---|
