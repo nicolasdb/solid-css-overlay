@@ -1,0 +1,25 @@
+# The root container of this server: the public may read it (the welcome
+# page, index.html), nobody may write to it through HTTP. Each pod has its own
+# .acl and is not affected. The image copies this file over stock CSS's
+# templates/root/intro/wac/.acl (Dockerfile), which initialize-intro.json
+# writes on first start only.
+#
+# Why not the stock one: it gives foaf:Agent Read, Write, Append and Control on
+# <./> with acl:default, and its header says "DO NOT USE UNMODIFIED UNLESS FOR
+# TESTING PURPOSES". On two live instances (2026-11-23) scanners had POSTed
+# exploit probes into the root, and anyone could have replaced the welcome page
+# or this very file. The welcome page needs no HTTP write: start/welcome.js puts
+# it in the data from the filesystem.
+#
+# An instance created before this image keeps the root .acl it has:
+# docs/root-acl.md says how to replace it.
+
+@prefix acl: <http://www.w3.org/ns/auth/acl#>.
+@prefix foaf: <http://xmlns.com/foaf/0.1/>.
+
+<#public>
+    a               acl:Authorization;
+    acl:agentClass  foaf:Agent;
+    acl:mode        acl:Read;
+    acl:accessTo    <./>;
+    acl:default     <./>.

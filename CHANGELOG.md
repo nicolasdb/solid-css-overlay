@@ -4,6 +4,16 @@ Versions are `<stock CSS version>-<n>`: a new stock release starts at `-1`, a
 new overlay on the same stock adds one. A tag `v<version>` publishes both
 images (`.github/workflows/build.yml`).
 
+## Unreleased
+
+- **The root container is public read only** (#47). The image now writes
+  `overlay/root/.acl` (public `acl:Read` on the root, `accessTo` and
+  `default`) where stock CSS took its root `.acl`, which gave the public
+  Read, Write, Append and Control: scanners had posted probe files into two
+  live roots. A template file, no config or code change. **New data volumes
+  only**: an existing instance replaces its root `.acl` by hand once,
+  `docs/root-acl.md`. CI checks it (`test/root-acl.sh`, both layouts).
+
 ## 7.3.0-5 — 2026-11-18
 
 On stock CSS 7.3.0. **The connector reads collectives in the new vocabulary**

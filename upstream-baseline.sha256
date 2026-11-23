@@ -16,3 +16,4 @@ e279ff53c05fafe1d6934bc192b3a1582b348ae8ac7e711e5818e74ae9512976  identity/passw
 bcf1c2377eb25f2f98bd697e55e3f4030f4a1cdff93b1c7500e16e9eb07246dd  identity/password/reset-email.html.ejs
 5959dfa82a88b4c253b85b85cf506d4e3e9890d23f66e0657dfa1e0775341f2a  pod/base/README$.md.hbs
 8fdf3ed1f59a7cb67a9a216ea227ebf638aa058e66bafe0707810c1901182985  pod/base/profile/card$.ttl.hbs
+8c073339663960b90b970e6c39d9ce6313b1a05043dc1d026f65345d1e1f90ba  root/intro/wac/.acl

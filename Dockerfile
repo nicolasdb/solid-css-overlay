@@ -67,6 +67,11 @@ COPY overlay/doc-view/doc-view.js overlay/doc-view/doc-view.css templates/doc-vi
 # writes into the root container on first start only; start/welcome.js puts it
 # there again at every later start (README, "The welcome page").
 COPY overlay/welcome/index.html templates/root/intro/base/index.html
+# The root .acl the same initializer writes: public read only. Stock gives the
+# public Read, Write, Append and Control on the root (overlay/root/.acl says
+# what that let in). First start only, like the page: docs/root-acl.md for an
+# instance that already has data.
+COPY overlay/root/.acl templates/root/intro/wac/.acl
 # The default skin. An instance mounts its own skin.css and fonts over these.
 COPY skins/pod/skin.css templates/styles/skin.css
 COPY skins/pod/fonts/ templates/fonts/skin/
