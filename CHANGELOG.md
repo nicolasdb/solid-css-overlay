@@ -4,7 +4,7 @@ Versions are `<stock CSS version>-<n>`: a new stock release starts at `-1`, a
 new overlay on the same stock adds one. A tag `v<version>` publishes both
 images (`.github/workflows/build.yml`).
 
-## Unreleased
+## 7.3.0-6 — 2026-11-23
 
 - **The server no longer stops every hour** (CSS issue #2297). Stock CSS
   7.3.0 stalls on a lock when it cleans up expired login sessions, then
