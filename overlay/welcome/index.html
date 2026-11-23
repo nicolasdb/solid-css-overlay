@@ -47,6 +47,25 @@
       <a id="registration-link" href="/.account/login/password/register/" class="button primary">Create an account</a>
       <a id="login-link" href="/.account/login/password/" class="button">Log in</a>
     </p>
+    <p class="hint" id="start-hint" hidden>It sets up your account, your pod and your WebID, one step at a time.</p>
+    <!-- When the instance has a backoffice (BACKOFFICE_URL, listed in
+         provider.json as apps.backoffice), newcomers start there: the
+         provider's own sign-up ends on an account page with no pod and no
+         next step. Same button, so the page keeps one call to action; without
+         scripts, or without a backoffice, the stock sign-up link stays. -->
+    <script>
+      fetch("/.well-known/css/provider.json", { cache: "no-cache" })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+          const url = d && d.apps && d.apps.backoffice && d.apps.backoffice.url;
+          if (typeof url !== "string" || !url.startsWith("https://")) return;
+          const link = document.getElementById("registration-link");
+          link.href = url;
+          link.textContent = "Start here";
+          document.getElementById("start-hint").hidden = false;
+        })
+        .catch(() => {});
+    </script>
 
     <h2>What is a pod?</h2>
     <ul class="ideas">

@@ -41,6 +41,33 @@ const descriptor = {
   capabilities,
 };
 
+// The instance's backoffice, where a newcomer starts (ADR 010 amendment,
+// point 12). Not a capability: an app beside the server, not something the
+// server does. The welcome page and the account page read it here to say
+// "start here"; a fresh instance without it left people on an account page
+// with no pod, no WebID and no next step (found on pod.syntonie.be,
+// 2026-11-23). https only; anything else is left out, never guessed at.
+const backoffice = (env.BACKOFFICE_URL || "").trim();
+if (backoffice) {
+  let url = null;
+  try {
+    url = new URL(backoffice);
+  } catch {}
+  if (url && url.protocol === "https:") {
+    if (!url.pathname.endsWith("/")) url.pathname += "/";
+    descriptor.apps = { backoffice: { url: url.href } };
+    // The account features need the server's cookie, sent same-site only.
+    const site = (h) => h.split(".").slice(-2).join(".");
+    try {
+      if (site(url.hostname) !== site(new URL(env.CSS_BASE_URL).hostname)) {
+        console.warn(`[solid-css-overlay] BACKOFFICE_URL ${url.href} is not on this server's site: its account features will not work (ADR 010)`);
+      }
+    } catch {}
+  } else {
+    console.warn(`[solid-css-overlay] BACKOFFICE_URL ignored: not an https:// address (${backoffice})`);
+  }
+}
+
 const write = (path, text) => {
   try {
     fs.writeFileSync(path, text);
@@ -55,4 +82,5 @@ write(
   "// Written at start by solid-css-overlay (start/describe.js), from CSS_CONFIG.\n" +
     `window.podLayout = ${JSON.stringify(layout)};\n`
 );
-console.log(`[solid-css-overlay] ${descriptor.version}, ${layout} pods, offers: ${Object.keys(capabilities).join(", ")}`);
+console.log(`[solid-css-overlay] ${descriptor.version}, ${layout} pods, offers: ${Object.keys(capabilities).join(", ")}` +
+  (descriptor.apps ? `, backoffice ${descriptor.apps.backoffice.url}` : ""));

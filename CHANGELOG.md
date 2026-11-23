@@ -4,6 +4,20 @@ Versions are `<stock CSS version>-<n>`: a new stock release starts at `-1`, a
 new overlay on the same stock adds one. A tag `v<version>` publishes both
 images (`.github/workflows/build.yml`).
 
+## Unreleased
+
+- **A fresh instance says where to start** (#51). With `BACKOFFICE_URL`
+  in `.env` (https, the instance's solid-backoffice), `provider.json` lists
+  `apps.backoffice` (an addition, ADR 010 point 12), the stock welcome page's
+  first button becomes "Start here" to it, and an account page with no pod
+  says the backoffice sets up the pod and WebID. Before, someone who signed up
+  from the welcome page landed on an empty account page with no next step
+  (pod.syntonie.be, 2026-11-23). Unset, nothing changes. Instances with their
+  own welcome page (Maps of Making, pod.nicolasdb.eu) keep it as it is; they
+  get the account page line once they set `BACKOFFICE_URL`. CI's subdomain
+  smoke run sets it and checks both pages and the descriptor; the folder run
+  checks they say nothing without it.
+
 ## 7.3.0-6 — 2026-11-23
 
 - **The server no longer stops every hour** (CSS issue #2297). Stock CSS
