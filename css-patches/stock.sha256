@@ -1,0 +1,6 @@
+# Stock files the image replaces (css-patches/), hashed from
+# docker.io/solidproject/community-server:7.3.0 (and checked identical in the
+# running images of both instances, 2026-11-23). The Dockerfile refuses to build
+# if the stock file is not exactly this one: a CSS bump must look at the patch
+# (drop it if the release has the fix, re-port it otherwise).
+9a9e7123f297c2c61ef6b1aad3d4f1f8a88d5f8a7c245f9849b6473bc7dfa818  dist/storage/LockingResourceStore.js

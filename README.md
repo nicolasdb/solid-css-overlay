@@ -29,7 +29,8 @@ there, only without this overlay's extras.
 | **The welcome page** | Ours, or the vertical's from its design-system repo, put at the root at every start (`start/welcome.js`). |
 | **The root is public read only** | The root `.acl` written on first start (`overlay/root/.acl`) lets the public read the root, not write to it. Stock gives the public Read, Write, Append and Control there. First start only: an older instance fixes its own, [`docs/root-acl.md`](docs/root-acl.md). |
 | **The README a new pod starts with** | Ours: what is in the pod, what is public, how sharing and agents work, no Databrowser. Or the vertical's, from the same repo. |
-| **CSS itself** | Untouched. Files are added where stock CSS already looks (`templates/`), plus one config and two components (solid-kit ADR 012 says why the second). |
+| **CSS itself** | Untouched, with one temporary exception. Files are added where stock CSS already looks (`templates/`), plus one config and two components (solid-kit ADR 012 says why the second). |
+| **One upstream fix, until CSS releases it** | CSS 7.3.0 stops every hour or so when it cleans up expired login sessions (CSS issue #2297). The image replaces one stock file with the upstream fix (PR #2298), nothing more: [`css-patches/`](css-patches/), [solid-kit ADR 014](https://github.com/nicolasdb/solid-kit/blob/main/docs/adr/014-temporary-upstream-patch-css-lock-wrapper.md). It goes away with the first CSS release that has the fix. Check a server: `docker exec <container> cmp /opt/css-patches/2297-lock-wrapper/LockingResourceStore.js /community-server/dist/storage/LockingResourceStore.js` prints nothing when the fix is live. |
 
 `config/suffix.json` keeps pods as folders (`https://<server>/<name>/`), for an
 instance that already has pods that way. **An instance never switches between
