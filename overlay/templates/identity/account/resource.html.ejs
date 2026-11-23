@@ -2,13 +2,16 @@
     Kept from stock: every id and the whole script, but for two labels it sets
     ("Change" for "(update)", "Remove" for util.js's "(delete)").
     Changed: copy, an intro line, and the order — pods and WebIDs first, each
-    list before its add link. -%>
+    list before its add link. Added: #startHere, a line pointing to the
+    instance's backoffice (provider.json apps.backoffice, BACKOFFICE_URL) when
+    the account has no pod and no app is waiting for the sign-in. -%>
 <h1>Your account</h1>
 <p class="error" id="error"></p>
 <p class="intro">Everything this server keeps for you: your pods, the WebIDs that act as you, and the ways you log in.</p>
 <div id="pods">
   <h2>Pods</h2>
   <p>The pods this account created.</p>
+  <p class="hint hidden" id="startHere">No pod yet? <a id="startHereLink" href="">The backoffice</a> sets up your pod and your WebID, one step at a time.</p>
   <ul id="podEntries"></ul>
   <a id="createPod" href="" class="link">Create a pod</a>
 </div>
@@ -72,6 +75,21 @@
     } else {
       updateElement('createPod', controls.html.account.createPod, { href: true });
       showAccountInfo(elements.podEntries, pods, true, false);
+    }
+
+    // Not stock: a new account lands here with nothing in it. When the
+    // instance names its backoffice, say where to start; never during an
+    // app's sign-in (that app may be the backoffice itself).
+    if (!<%= authenticating %> && Object.keys(pods ?? {}).length === 0) {
+      fetch('/.well-known/css/provider.json', { cache: 'no-cache' })
+        .then((r) => r.ok ? r.json() : null)
+        .then((d) => {
+          const url = d?.apps?.backoffice?.url;
+          if (typeof url !== 'string' || !url.startsWith('https://')) return;
+          document.getElementById('startHereLink').href = url;
+          setVisibility('startHere', true);
+        })
+        .catch(() => {});
     }
 
     // Update WebID entries

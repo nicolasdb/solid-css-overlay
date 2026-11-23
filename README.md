@@ -147,6 +147,13 @@ it lists; stock CSS has no such file, which means "nothing beyond Solid".
   does not open anything (CSS always lets anyone sign up), so turn it on once
   the gateway rate-limits `/.account/` (point 11). No entry, no creation
   offered: the app sends the person to the provider's own sign-up page.
+- `apps.backoffice` is listed only with `BACKOFFICE_URL` set (https, ADR 010
+  amendment, point 12): `"apps": { "backoffice": { "url": "https://backoffice.example.org/" } }`.
+  Beside `capabilities`, not in it: an app next to the server, not something
+  the server does. The stock welcome page then turns "Create an account" into
+  "Start here" to it, and an account page with no pod points to it (not while
+  an app is waiting for the sign-in). A welcome page an instance mounts from
+  its design-system repo gets neither: it names its apps itself.
 - **A public contract**: fields are only ever added, never renamed or removed.
   It grants nothing: the connector keeps `ONBOARD_CORS_ORIGINS`.
   `scripts/check-overrides.sh` checks it is served and agrees with

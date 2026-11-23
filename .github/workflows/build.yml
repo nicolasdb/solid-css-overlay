@@ -88,7 +88,8 @@ jobs:
         run: npm ci && /usr/bin/google-chrome --version
 
       - name: smoke, subdomain pods (the image's default)
-        env: { POD_LAYOUT: subdomain, TRY_NETWORK: host, CHROMIUM_PATH: /usr/bin/google-chrome }
+        # BACKOFFICE_URL here only: the folder run checks the pages without one.
+        env: { POD_LAYOUT: subdomain, TRY_NETWORK: host, CHROMIUM_PATH: /usr/bin/google-chrome, BACKOFFICE_URL: "https://backoffice.invalid/" }
         run: |
           test/try-local.sh 3123
           node test/smoke.mjs http://localhost:3123 test/shots/subdomain

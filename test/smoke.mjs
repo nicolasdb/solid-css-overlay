@@ -50,6 +50,16 @@ await page.fill("#confirmPassword", password);
 await page.click("button[type=submit]");
 await page.waitForURL(/\/\.account\/account\//);
 
+// A new account has no pod: the page points to the instance's backoffice when
+// it names one (BACKOFFICE_URL -> provider.json apps.backoffice), and says
+// nothing otherwise. The CI's subdomain run sets it, the folder run does not.
+const backoffice = process.env.BACKOFFICE_URL || "";
+await page.waitForLoadState("networkidle");
+const startHere = await page.$eval("#startHere", (p) => ({ shown: !p.classList.contains("hidden"), href: p.querySelector("a").href }));
+check(backoffice ? startHere.shown && startHere.href === backoffice : !startHere.shown,
+  `account without a pod: ${backoffice ? `points to ${backoffice}` : "no backoffice line"} (shown ${startHere.shown}, ${startHere.href})`);
+await shot(page, "01b-account-no-pod");
+
 // With subdomain pods the name becomes a hostname: a name that cannot be one
 // is refused by the form before any request, and by the server (PodNameGuard)
 // when the form is not used, with a reserved name refused too. The API calls
@@ -277,11 +287,17 @@ await shot(p360, "10-consent-360");
 // Welcome page and forgot password
 const w = await fresh.newPage();
 await w.goto(`${base}/`);
+await w.waitForLoadState("networkidle");
 check(/skin\.css/.test(await w.content()), "welcome: the root page is ours (links skin.css)");
 // Until 7.2.0-4 the generic page shipped placeholders an instance had to
 // replace, and one went live showing them (pod.example.org, a dead app link).
 check((await w.textContent("#server-host")) === new URL(base).host, "welcome: the header names this server's host");
 check(!/example\.org/.test(await w.innerText("body")) && !(await w.$$eval("a[href*=\"example.org\"]", (a) => a.length)), "welcome: no placeholder host or link a visitor sees");
+const signUp = await w.$eval("#registration-link", (a) => ({ text: a.textContent.trim(), href: a.href }));
+check(backoffice ? signUp.text === "Start here" && signUp.href === backoffice : signUp.text === "Create an account",
+  `welcome: the first button is ${backoffice ? "Start here, to the backoffice" : "the server's own sign-up"} (got "${signUp.text}" ${signUp.href})`);
+const descriptor = await (await w.request.get(`${base}/.well-known/css/provider.json`)).json();
+check((descriptor.apps?.backoffice?.url || "") === backoffice, `provider.json: apps.backoffice is ${backoffice || "absent"}`);
 await shot(w, "11-welcome");
 await w.goto(`${base}/.account/login/password/forgot/`);
 await submitReady(w);
