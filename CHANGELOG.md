@@ -4,7 +4,7 @@ Versions are `<stock CSS version>-<n>`: a new stock release starts at `-1`, a
 new overlay on the same stock adds one. A tag `v<version>` publishes both
 images (`.github/workflows/build.yml`).
 
-## Unreleased
+## 7.3.0-8 — 2026-11-24
 
 - **The "Link a WebID" page says what it is** (#54). Stock CSS titles it
   "Create account"; the overlay's copy says "Link a WebID from elsewhere",
