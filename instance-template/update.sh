@@ -109,7 +109,9 @@ switch() { # version ref -> 0 when it runs and says so
   for image in $(docker compose config --images); do
     docker image inspect "$image" >/dev/null 2>&1 || { echo "   no image $image (not published, or the pull failed)"; return 1; }
   done
-  docker compose up -d --force-recreate --wait --wait-timeout 180 || return 1
+  # Longer than the healthcheck's start_period (compose.yml): a slow but sound
+  # start must not roll back (pod.syntonie.be, 2026-11-24).
+  docker compose up -d --force-recreate --wait --wait-timeout 360 || return 1
   # Not `grep -q`: it stops reading at the first match, `docker logs` then
   # dies of SIGPIPE, and with pipefail the check fails on an instance whose
   # log is long (mom-pods, 2026-10-31: a healthy 7.2.0-11 rolled back).
