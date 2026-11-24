@@ -13,7 +13,8 @@ Community Solid Server 7.3 keeps three separate things:
   signs it in (`solid:oidcIssuer`) and where its data is (`pim:storage`).
 - **A pod** is storage, for example `https://openfab.pod.syntonie.be/`. An
   account can create several. Each pod remembers the account that created it,
-  and has a list of **owners**: WebIDs that always have full control over it.
+  and has a list of **owners**: WebIDs that can always read and change its
+  access rules (`.acl` files). Not its files: those follow the rules.
 
 ## The question: a school and its classroom
 
@@ -40,10 +41,13 @@ address. Possible (that is what tier 1 is for), but it is a migration.
 - the profiles already say how the two relate (`org:subOrganizationOf` on
   OpenFab's, `org:hasSubOrganization` on Syntonie's);
 - OpenFab's account adds Syntonie's WebID as a **pod owner** of the openfab
-  pod. CSS then always grants that WebID full control, `.acl` files
-  included (`OwnerPermissionReader`), whatever the ACLs say. Syntonie keeps
-  a way back in without sharing a password, and it can be removed again
-  (CSS refuses only to remove a pod's last owner).
+  pod. CSS then always lets that WebID read and change the pod's `.acl`
+  files, whatever they say (`OwnerPermissionReader` grants on `.acl`
+  resources only, checked against CSS 7.3.0's source on 2026-11-24). The
+  files themselves follow the rules, so Syntonie is also named in the
+  pod's root `.acl`. Syntonie keeps a way back in without sharing a
+  password, and it can be removed again (CSS refuses only to remove a pod's
+  last owner).
 
 So the choice is lopsided: two accounts can be joined by one owner entry, one
 account can only be split by a migration. Start with two.
@@ -63,3 +67,9 @@ layout only keeps every answer open.
 
 The account email is a shared role address, never a person's: the account
 then follows the role when the people change.
+
+The openfab pod was created from the backoffice before its WebID was linked,
+so it also has the WebID the pod made for itself
+(`https://openfab.pod.syntonie.be/profile/card#me`), named beside
+`id.openfab.be` in every rule. How it was done, and the shorter path for
+the next collective: [How-to](how-to.md).

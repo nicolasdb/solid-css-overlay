@@ -4,6 +4,15 @@ Versions are `<stock CSS version>-<n>`: a new stock release starts at `-1`, a
 new overlay on the same stock adds one. A tag `v<version>` publishes both
 images (`.github/workflows/build.yml`).
 
+## Unreleased
+
+- **Docs: how a collective gets a WebID on its own domain and a pod**
+  (`docs/collectives/how-to.md`), written from OpenFab's setup on
+  pod.syntonie.be: backoffice sign-up, link the WebID, add it as pod owner,
+  name it in every `.acl`, sign in as it; troubleshooting and the shorter
+  path. The explanation now says what a pod owner gets: the `.acl` files,
+  not the data.
+
 ## 7.3.0-8 — 2026-11-24
 
 - **The "Link a WebID" page says what it is** (#54). Stock CSS titles it
