@@ -4,7 +4,7 @@ Versions are `<stock CSS version>-<n>`: a new stock release starts at `-1`, a
 new overlay on the same stock adds one. A tag `v<version>` publishes both
 images (`.github/workflows/build.yml`).
 
-## Unreleased
+## 7.3.0-9 — 2026-11-24
 
 - **Docs: how a collective gets a WebID on its own domain and a pod**
   (`docs/collectives/how-to.md`), written from OpenFab's setup on
