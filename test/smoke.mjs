@@ -199,6 +199,11 @@ const agentId = `${podUrl("nicolas")}profile/agent#me`;
 const accountControls = (await (await page.request.get(`${base}/.account/`, { headers: { accept: "application/json" } })).json()).controls;
 const linked = await page.request.post(accountControls.account.webId, { data: { webId: agentId } });
 check(linked.ok(), `consent: an agent WebID links to the account (${linked.status()})`);
+// The link page has its own heading (stock says "Create account" there).
+await page.goto(accountControls.html.account.linkWebId);
+await page.waitForSelector("#mainForm");
+check((await page.textContent("h1")).trim() === "Link a WebID from elsewhere", "link WebID page: its own heading");
+await shot(page, "01c-link-webid");
 const delegating = async (route) => {
   const res = await route.fetch();
   const body = (await res.text()) + `\n<${card}> <http://www.w3.org/ns/auth/acl#delegates> <${agentId}> .\n`;

@@ -1,0 +1,54 @@
+<%# Override of CSS 7.3.0 identity/account/link-webid.html.ejs (upstream-baseline.sha256).
+    Kept from stock: every id and name, and the request in addPostListener.
+    Changed: the heading (stock says "Create account" on this page) and the copy,
+    which now says what linking is for and what the line after it means.
+    Stock never fills #response-existingWebId; it stays, empty, after "this WebID". -%>
+<h1>Link a WebID from elsewhere</h1>
+<form method="post" id="mainForm">
+  <p class="error" id="error"></p>
+
+  <fieldset>
+    <p>A WebID you already have, on another server or on your own domain (<code>https://id.example.org/profile/card#me</code>). Once linked, you log in here as that WebID.</p>
+    <ol>
+      <li>
+        <label for="webId">WebID</label>
+        <input id="webId" type="text" name="webId" autofocus>
+      </li>
+    </ol>
+    <p class="hint">This server first asks you to prove the WebID is yours: it shows a line to add to the WebID's document. Add it, link again, then remove it.</p>
+  </fieldset>
+
+  <ul class="actions">
+    <li><button type="submit" name="submit" disabled>Link WebID to account</button></li>
+    <li><button type="button" id="account-link">Back</button></li>
+  </ul>
+</form>
+<div class="hidden" id="response">
+  <p>
+    Linked. To log in here as this WebID<em id="response-existingWebId"></em>,
+    its document must name this server as its login provider. If it does not
+    yet, add this line:
+  </p>
+  <p>
+    <strong><code id="oidc-triple"></code></strong>
+  </p>
+  <p class="hint">The verification line you added before can go now.</p>
+
+  <p class="actions"><button type="button" id="response-account-link">Back</button></p>
+</div>
+
+
+<script>
+  (async() => {
+    const controls = await fetchControls('<%= idpIndex %>');
+    setRedirectClick('account-link', controls.html.account.account);
+    setRedirectClick('response-account-link', controls.html.account.account);
+
+    addPostListener(async() => {
+      const { webId, oidcIssuer } = await postJsonForm(controls.account.webId);
+      updateElement('oidc-triple', `<${webId}> <http://www.w3.org/ns/solid/terms#oidcIssuer> <${oidcIssuer}>.`, { innerText: true });
+      setVisibility('response', true);
+      setVisibility('mainForm', false);
+    });
+  })();
+</script>
