@@ -55,7 +55,11 @@ services:
       interval: 10s
       timeout: 10s
       retries: 10
-      start_period: 40s
+      # CSS loads ~900 components before it listens: ~2 minutes on a 2 GB VPS
+      # (pod.syntonie.be, 2026-11-24: 122 s from start to "Listening", and an
+      # update rolled back because 40 s + 10 retries ran out first). Failures
+      # inside start_period do not count, so a slow start is not "unhealthy".
+      start_period: 180s
     # Measured ~160 MiB idle (Maps of Making, 2026-10-25). Without a limit a
     # leak or a burst takes the whole host down with it, the other stacks
     # included; with one, only CSS restarts. A bigger instance raises it.

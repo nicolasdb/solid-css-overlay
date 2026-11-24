@@ -13,6 +13,12 @@ images (`.github/workflows/build.yml`).
   path. The explanation now says what a pod owner gets: the `.acl` files,
   not the data.
 
+- **A slow start is not a failed update** (instance-template). CSS took
+  about 2 minutes to listen on pod.syntonie.be (2 GB VPS), the healthcheck
+  gave it 40 s + 10 retries, and `update.sh` rolled a sound 7.3.0-8 back.
+  `start_period` is now 180 s and `update.sh` waits up to 360 s. A
+  checkout picks it up with its next `update.sh`.
+
 ## 7.3.0-8 — 2026-11-24
 
 - **The "Link a WebID" page says what it is** (#54). Stock CSS titles it
