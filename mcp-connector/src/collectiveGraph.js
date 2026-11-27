@@ -32,6 +32,7 @@
  */
 
 const N3 = require("n3");
+const { memberDelegatesTo } = require("./memberDelegates");
 const { Parser: SparqlParser, Generator: SparqlGenerator } = require("sparqljs");
 
 const OXIGRAPH_URL = (process.env.OXIGRAPH_URL || "http://oxigraph:7878").replace(/\/$/, "");
@@ -209,14 +210,12 @@ async function authorizeReader(collective, webId, fetchFn, now = Date.now()) {
   if (members.includes(webId)) {
     actingFor = webId;
   } else {
-    // A member's agent: declared by the member, in the member's own profile.
+    // A member's agent: declared by the member, in the member's profile or its extended profile.
     const declared = await Promise.all(
       members.map(async (member) => {
         try {
-          const doc = new URL(member);
-          doc.hash = "";
-          const profile = await getTurtle(doc.href, fetchFn);
-          return objectsOf(parseTurtle(profile.text, doc.href), member, NS.acl + "delegates").includes(webId) ? member : null;
+          // The profile, and the extended profile it links inside its own storage (memberDelegates.js).
+          return (await memberDelegatesTo(member, webId, fetchFn)) ? member : null;
         } catch {
           return null;
         }
