@@ -4,7 +4,7 @@ Versions are `<stock CSS version>-<n>`: a new stock release starts at `-1`, a
 new overlay on the same stock adds one. A tag `v<version>` publishes both
 images (`.github/workflows/build.yml`).
 
-## Unreleased
+## 7.3.0-10 — 2026-11-27
 
 - **Connector: `acl:delegates` is also read from a member's extended profile**
   (#60, solid-kit ADR 002 amendment). A tier-1 WebID card is a static file no
