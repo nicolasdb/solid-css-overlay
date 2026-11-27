@@ -94,7 +94,7 @@ Config via env vars:
 pod's `depots/` and `confrontations/` into Oxigraph (`graph_ingest`: one
 named graph per document, named by its pod address, replaced on each
 ingest). The collective's agent, a member, or an agent a member declares
-with `acl:delegates`, asks it read-only (`graph_query`), over the folders it can read on the pod at
+with `acl:delegates` (in their profile, or in an extended profile the profile links with `rdfs:seeAlso` / `foaf:isPrimaryTopicOf` inside its own `pim:storage`; `src/memberDelegates.js`), asks it read-only (`graph_query`), over the folders it can read on the pod at
 that moment. The query is parsed and regenerated before it is sent; `SERVICE`
 and updates are refused, because `SERVICE` escapes the dataset restriction.
 `scripts/verify-collective-graph.js` pins all of it against a throwaway
