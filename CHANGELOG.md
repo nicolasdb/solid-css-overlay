@@ -14,6 +14,14 @@ images (`.github/workflows/build.yml`).
   card declares; an unreadable linked document is ignored
   (`src/memberDelegates.js`).
 
+- **Docs: the shorter path for a collective's WebID** (`docs/collectives/how-to.md`).
+  Two paths now: no pod yet (register on the server's page, link, create the
+  pod with "A WebID I already have elsewhere": every rule names the WebID;
+  Syntonie, 2026-11-26) and a pod already there (OpenFab). The profile follows
+  solid-kit ADR 002's amendment (preferences file, type index, links to the
+  extended profile `profile/about.ttl`), with how to create it; removing an
+  old WebID; "Failed to fetch" in troubleshooting.
+
 ## 7.3.0-9 — 2026-11-24
 
 - **Docs: how a collective gets a WebID on its own domain and a pod**
